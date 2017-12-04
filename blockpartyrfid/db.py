@@ -196,12 +196,18 @@ def rfid_events_to_duration(re, min_duration=None):
     return d[:, :4]
 
     
-def find_overlapping_durations(a, b):
+def find_overlapping_durations(a, b, margin=None):
+    if margin is None:
+        margin = [0, 0]
     inds = []
     for ai in xrange(len(a)):
         sa = a[ai]
+        st = sa[0] - margin[0]
+        et = sa[1] + margin[1]
         i = numpy.where(
-            ((b[:, 0] < sa[0]) & (b[:, 1] > sa[0])) |
-            ((b[:, 0] < sa[1]) & (b[:, 1] > sa[1])))[0]
+            numpy.logical_not((b[:, 0] > et) | (b[:, 1] < st)))[0]
+        #i = numpy.where(
+        #    ((b[:, 0] < st) & (b[:, 1] > st)) |
+        #    ((b[:, 0] < et) & (b[:, 1] > et)))[0]
         inds.append(list(i))
     return inds
