@@ -211,3 +211,58 @@ def find_overlapping_durations(a, b, margin=None):
         #    ((b[:, 0] < et) & (b[:, 1] > et)))[0]
         inds.append(list(i))
     return inds
+
+    
+def find_neighbors(
+        ri, rlo, lro, rio, lio,
+        linds=None, rinds=None, iinds=None, visited=None):
+    if rinds is None:
+        rinds = []
+        linds = []
+        iinds = []
+        visited = set()
+     if len(rlo[ri]) != 0:  # has overlapping 'left'
+        linds.append(rlo[ri])
+        # recurse on lro
+        for li in rlo[ri]:
+            for sri in lro[li]:
+                if sri not in visited:
+                    sl, sr, si = find_neighbors(
+                        sri, rlo, lro, rio, lio,
+                        linds, rinds, iinds, visited)
+                    visited.add(sri)
+    # for each right index find overlapping
+    pass
+    
+def find_tube_events(board_events, margin=None, min_duration=None):
+    if len(numpy.unique(board_events[:, consts.BOARD_COLUMN])) != 1:
+        raise Exception("Only works for 1 board")
+    # find left/right beam events
+    lbe = beam_events_to_duration(
+        sel(board_events, event='beam', side='l'), min_duration)
+    rbe = beam_events_to_duration(
+        sel(board_events, event='beam', side='r'), min_duration)
+    ie = rfid_events_to_duration(
+        sel(board_events, event='rfid'))
+    # find overlapping beam durations
+    rlo = find_overlapping_durations(rbe, lbe)
+    lro = find_overlapping_durations(lbe, rbe)
+    rio = find_overlapping_durations(rbe, ie)
+    lio = find_overlapping_durations(lbe, ie)
+    # merge beam durations
+    tube_events = []
+    visited = []
+    for ri in xrange(len(rlo)):
+        if ri in visited:
+            continue
+        # for each index in right, find 'neighbors'
+        linds, rinds, iinds = find_neighbors(ri, rlo, lro, rio, lio)
+        te = {
+            'start': st,
+            'end': et,
+            'lbi': linds,
+            'rbi': rinds,
+            'ii': iinds,
+        }
+        tube_events.append(te)
+        visited.extend(rinds)
