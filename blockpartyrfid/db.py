@@ -138,7 +138,7 @@ def closest_event(evs, t, max_dt=None):
         return None
     return evs[i]
 
-    
+
 def next_event(evs, t, max_dt=None):
     dts = evs[:, consts.TIME_COLUMN] - t
     dts[dts < 0] = dts.max()
@@ -195,7 +195,7 @@ def rfid_events_to_duration(re, min_duration=None):
         d = d[d[:, 2] >= min_duration]
     return d[:, :4]
 
-    
+
 def find_overlapping_durations(a, b, margin=None):
     if margin is None:
         margin = [0, 0]
@@ -212,57 +212,81 @@ def find_overlapping_durations(a, b, margin=None):
         inds.append(list(i))
     return inds
 
-    
-def find_neighbors(
-        ri, rlo, lro, rio, lio,
-        linds=None, rinds=None, iinds=None, visited=None):
-    if rinds is None:
-        rinds = []
-        linds = []
-        iinds = []
-        visited = set()
-     if len(rlo[ri]) != 0:  # has overlapping 'left'
-        linds.append(rlo[ri])
-        # recurse on lro
-        for li in rlo[ri]:
-            for sri in lro[li]:
-                if sri not in visited:
-                    sl, sr, si = find_neighbors(
-                        sri, rlo, lro, rio, lio,
-                        linds, rinds, iinds, visited)
-                    visited.add(sri)
-    # for each right index find overlapping
-    pass
-    
+
+def find_neighbors(index, key, omap, inds=None, visited=None):
+    if inds is None:
+        inds = {'l': [], 'r': [], 'i': []}
+        visited = {'l': set(), 'r': set(), 'i': set()}
+    if index in visited[key]:
+        return inds
+    visited[key].add(index)
+    okeys = {
+        'r': ['l', 'i'],
+        'l': ['r', 'i'],
+        'i': ['l', 'r']}[key]
+    for okey in okeys:
+        for oi in omap[key][okey][index]:
+            if oi in visited[okey]:
+                continue
+            inds[okey].append(oi)
+            # recurse
+            find_neighbors(oi, okey, omap, inds, visited)
+    return inds
+
+
+def generate_overlap_map(le, re, ie, margin=None):
+    return {
+        'l': {
+            'r': find_overlapping_durations(le, re),
+            'i': find_overlapping_durations(le, ie, margin),
+        },
+        'r': {
+            'l': find_overlapping_durations(re, le),
+            'i': find_overlapping_durations(re, ie, margin),
+        },
+        'i': {
+            'l': find_overlapping_durations(ie, le, margin),
+            'r': find_overlapping_durations(ie, re, margin),
+        }
+    }
+
+
 def find_tube_events(board_events, margin=None, min_duration=None):
     if len(numpy.unique(board_events[:, consts.BOARD_COLUMN])) != 1:
         raise Exception("Only works for 1 board")
     # find left/right beam events
     lbe = beam_events_to_duration(
-        sel(board_events, event='beam', side='l'), min_duration)
+        sel(board_events, event='beam', data0=consts.BEAM_LEFT), min_duration)
     rbe = beam_events_to_duration(
-        sel(board_events, event='beam', side='r'), min_duration)
+        sel(board_events, event='beam', data0=consts.BEAM_RIGHT), min_duration)
     ie = rfid_events_to_duration(
         sel(board_events, event='rfid'))
+    ed = {'l': lbe, 'r': rbe, 'i': ie}
     # find overlapping beam durations
-    rlo = find_overlapping_durations(rbe, lbe)
-    lro = find_overlapping_durations(lbe, rbe)
-    rio = find_overlapping_durations(rbe, ie)
-    lio = find_overlapping_durations(lbe, ie)
+    omap = generate_overlap_map(lbe, rbe, ie, margin)
     # merge beam durations
     tube_events = []
-    visited = []
-    for ri in xrange(len(rlo)):
+    visited = set()
+    for ri in xrange(len(rbe)):
         if ri in visited:
             continue
         # for each index in right, find 'neighbors'
-        linds, rinds, iinds = find_neighbors(ri, rlo, lro, rio, lio)
+        inds = find_neighbors(ri, 'r', omap)
+        inds['r'].append(ri)
+        # find start/end times
+        st = ed['r'][ri][0]
+        et = ed['r'][ri][1]
+        for k in inds:
+            for i in inds[k]:
+                d = ed[k][i]
+                st = min(st, d[0])
+                et = max(et, d[1])
         te = {
             'start': st,
             'end': et,
-            'lbi': linds,
-            'rbi': rinds,
-            'ii': iinds,
         }
+        for k in 'lri':
+            te[k] = numpy.array([ed[k][i] for i in inds[k]])
         tube_events.append(te)
-        visited.extend(rinds)
+        [visited.add(ri) for ri in inds['r']]
+    return tube_events
