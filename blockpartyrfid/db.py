@@ -251,7 +251,8 @@ def generate_overlap_map(le, re, ie, margin=None):
     }
 
 
-def find_tube_events(board_events, margin=None, min_duration=None):
+def find_tube_events(
+        board_events, margin=None, min_duration=None, remove_conflicts=True):
     if len(numpy.unique(board_events[:, consts.BOARD_COLUMN])) != 1:
         raise Exception("Only works for 1 board")
     # find left/right beam events
@@ -273,6 +274,11 @@ def find_tube_events(board_events, margin=None, min_duration=None):
         # for each index in right, find 'neighbors'
         inds = find_neighbors(ri, 'r', omap)
         inds['r'].append(ri)
+        [visited.add(ri) for ri in inds['r']]
+        
+        if len(inds['l']) == 0:
+            continue
+        
         # find start/end times
         st = ed['r'][ri][0]
         et = ed['r'][ri][1]
@@ -281,12 +287,44 @@ def find_tube_events(board_events, margin=None, min_duration=None):
                 d = ed[k][i]
                 st = min(st, d[0])
                 et = max(et, d[1])
+        direction = '?'
+        if len(inds['l']) == 1 and len(inds['r']) == 1:
+            l = ed['l'][inds['l'][0]][0]
+            r = ed['r'][inds['r'][0]][0]
+            if l < r:
+                direction = 'r'
+            else:
+                direction = 'l'
         te = {
             'start': st,
             'end': et,
+            'animals': set([ed['i'][i][3] for i in inds['i']]),
+            'direction': direction,
         }
         for k in 'lri':
             te[k] = numpy.array([ed[k][i] for i in inds[k]])
         tube_events.append(te)
-        [visited.add(ri) for ri in inds['r']]
+    if remove_conflicts:
+        unassign_conflicting_tube_event_directions(tube_events)
     return tube_events
+    
+def unassign_conflicting_tube_event_directions(te):
+    state = {}
+    cs = []
+    for (i, e) in enumerate(te):
+        if e['direction'] == '?':
+            for a in state:
+                state[a] = '?'
+            continue
+        conflict = False
+        for a in e['animals']:
+            if a in state and state[a] == e['direction']:  # conflict
+                conflict = True
+                cs.append(i)
+            state[a] = e['direction']
+        #if conflict:
+        #    e['direction'] = '?'
+        #    for a in state:
+        #        state[a] = '?'
+    for c in cs:
+        te[c]['direction'] = '?'

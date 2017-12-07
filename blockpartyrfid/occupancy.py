@@ -379,3 +379,140 @@ def by_isolated_transitions(
                 occupancy.append(
                     [enter_time, exit_time, cage_n, i['a'], i['direction']])
     return numpy.array(occupancy), irfid_dict
+
+    
+def assign_direction_to_tube_events(te):
+    for e in te:
+        ni = len(set([i[3] for i in e['i']]))
+        nl = len(e['l'])
+        nr = len(e['r'])
+        if nl == 1 and nr == 1:  # assign direction
+            if e['l'][0][0] < e['r'][0][0]:  # moving right
+                e['direction'] = 'r'
+            else:
+                e['direction'] = 'l'
+        else:
+            e['direction'] = '?'
+
+
+def tube_events_to_occupancy(te):
+    # state of each animal
+    # animal_id: {
+    #   previous: previous tube event (either for this animal or unassigned)
+    state = {}
+    last_unassigned = None
+    occupancy = []
+    for e in te:
+        if e['direction'] == '?':
+            # if previous event for this animal had a direction
+            # assign occupancy over that period
+            for a in e['animals']:
+                if a in state:
+                    if state[a]['previous']['direction'] != '?':
+                        occupancy.append([
+                            state[a]['previous']['end'],
+                            e['start'],
+                            'lr'.index(state[a]['previous']['direction']),
+                            a,
+                            -1])
+                    # else previous direction is '?', do nothing
+                else:
+                    state[a] = {'previous': e}
+            for a in state:
+                state[a]['previous'] = e
+            last_unassigned = e
+        else:  # this transition has a direction l/r
+            for a in e['animals']:
+                if a in state:
+                    # TODO check for conflicts
+                    # fill from previous till now
+                    pe = state[a]['previous']
+                    occupancy.append([
+                        pe['end'], e['start'],
+                        1 - 'lr'.index(e['direction']),
+                        a,
+                        'lr'.index(e['direction'])])
+                else:  # first event for this animal
+                    if last_unassigned is not None:
+                        pe = last_unassigned
+                        occupancy.append([
+                            pe['end'], e['start'],
+                            1 - 'lr'.index(e['direction']),
+                            a,
+                            'lr'.index(e['direction'])])
+                    else:
+                        # TODO assign fromt start time?
+                        pass
+                    state[a] = {'previous': e}
+                state[a]['previous'] = e
+    # TODO assign to end time
+    return occupancy
+
+
+def merge_tube_event_occupancys(o0, o1):
+    # each occupancy has only left right
+    # right for o0 could be anything in o1
+    # left for o1 could be anything for o0
+    # conflicts could be:
+    # - simultaneuous reporting of left o0 and right o1
+    # - jumps from left o0 to right o1
+    
+    # start at index 0 for each
+    occupancy = []
+    # get copy of arrays to allow modification during iteration
+    o0 = numpy.array(o0, copy=True)
+    o1 = numpy.array(o1, copy=True)
+    # offset cage numbers for o1
+    o1[:, 2] += 1
+    i0, i1 = 0, 0
+    while i0 < len(o0) and i1 < len(o1):
+        e0 = o0[i0]
+        e1 = o1[i1]
+        # check if these overlap
+        if e0[1] < e1[0]:
+            # accept e0, continue
+            occupancy.append(list(e0))
+            i0 += 1
+            continue
+        elif e1[1] < e1[0]:
+            # accept e1, continue
+            occupancy.append(list(e1))
+            i1 += 1
+            continue
+        if e0[3] != e1[3]:  # not the same animal
+            if e0[1] < e1[1]:
+                occupancy.append(list(e0))
+                i0 += 1
+            else:
+                occupancy.append(list(e1))
+                i1 += 1
+            continue
+        # events overlap, same animal, combine & check for conflict
+        if e0[1] < e1[1]:
+            # e0 ends before e1
+            if e0[0] > e1[0]:
+                # e0 is 'inside' e1
+                # assign occupancy from start of e1 to start of e0
+                occupancy.append([e1[0], e0[0], e1[2], e1[3], -2])
+            # else, e0 preceeds e1
+            # assign occupancy from start of e0 to end of e0
+            occupancy.append([e0[0], e0[1], e0[2], e0[3], -3])
+            # then modify e1 start to end of e0
+            e1[0] = e0[1]
+            # advance e0
+            i0 += 1
+        else:
+            # e1 ends before e0
+            if e1[0] < e0[0]:
+                # e1 is 'inside' e0
+                # assign occupancy from start of e0 to start of e1
+                occupancy.append([e0[0], e1[0], e0[2], e0[3], -4])
+            # else e1 preceeds e1
+            # assign occupancy from start of e1 to end of e1
+            occupancy.append([e1[0], e1[1], e1[2], e1[3], -5])
+            # then modify e0 start to end of e1
+            e0[0] = e1[1]
+            # advance e1
+            i1 += 1
+    # TODO finish out events
+    return numpy.array(occupancy)
