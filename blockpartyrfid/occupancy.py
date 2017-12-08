@@ -449,7 +449,25 @@ def tube_events_to_occupancy(te):
     return occupancy
 
 
-def merge_tube_event_occupancys(o0, o1):
+def determine_cage(c0, c1):
+    if (c0 == 0) and (c1 == 2):
+        return None
+    elif (c0 == 0) and (c1 == 1):
+        return 0
+    elif (c1 == 2) and (c0 == 1):
+        return 2
+    elif (c0 == 0) and (c1 == 2):
+        return None
+    elif (c0 == 1) and (c1 == 1):
+        return 1
+    elif (c0 == 1) and (c1 is None):
+        return None
+    elif (c0 is None) and (c1 == 1):
+        return None
+    raise Exception("uncertain cage")
+
+
+def merge_tube_event_occupancys(o0, o1, animal=None):
     # each occupancy has only left right
     # right for o0 could be anything in o1
     # left for o1 could be anything for o0
@@ -460,36 +478,56 @@ def merge_tube_event_occupancys(o0, o1):
     # start at index 0 for each
     occupancy = []
     # get copy of arrays to allow modification during iteration
-    o0 = numpy.array(o0, copy=True)
-    o1 = numpy.array(o1, copy=True)
+    o0 = numpy.array(o0)
+    o1 = numpy.array(o1)
+    if animal is None or numpy.iterable(animal):
+        if numpy.iterable(animal):
+            animals = set(animal)
+        else:
+            animals = set(o0[:, 3]).union(set(o1[:, 3]))
+        d = {}
+        for a in animals:
+            d[a] = merge_tube_event_occupancys(o0, o1, animal=a)
+        return merge_occupancies(d.values(), cull=False)
+    else:
+        o0 = o0[o0[:, 3] == animal].copy()
+        o1 = o1[o1[:, 3] == animal].copy()
     # offset cage numbers for o1
-    o1[:, 2] += 1
+    if (max(o0[:, 2]) == max(o1[:, 2])):
+        o1[:, 2] += 1
     i0, i1 = 0, 0
     while i0 < len(o0) and i1 < len(o1):
         e0 = o0[i0]
         e1 = o1[i1]
         # check if these overlap
         if e0[1] < e1[0]:
-            # accept e0, continue
-            occupancy.append(list(e0))
+            # ignore e0, continue
+            #occupancy.append(list(e0))
+            #print("skipping 0")
             i0 += 1
             continue
-        elif e1[1] < e1[0]:
-            # accept e1, continue
-            occupancy.append(list(e1))
+        elif e1[1] < e0[0]:
+            # ignore e1, continue
+            #occupancy.append(list(e1))
+            #print("skipping 1")
             i1 += 1
             continue
-        if e0[3] != e1[3]:  # not the same animal
-            if e0[1] < e1[1]:
-                occupancy.append(list(e0))
-                i0 += 1
-            else:
-                occupancy.append(list(e1))
-                i1 += 1
-            continue
+        #if e0[3] != e1[3]:  # not the same animal
+        #    if e0[1] < e1[1]:
+        #        occupancy.append(list(e0))
+        #        i0 += 1
+        #    else:
+        #        occupancy.append(list(e1))
+        #        i1 += 1
+        #    continue
         # events overlap, same animal, combine & check for conflict
         if e0[1] < e1[1]:
             # e0 ends before e1
+            c = determine_cage(e0[2], e1[2])
+            if c is None:
+                e1[0] = e0[1]
+                i0 += 1
+                continue
             if e0[0] > e1[0]:
                 # e0 is 'inside' e1
                 # assign occupancy from start of e1 to start of e0
@@ -502,6 +540,11 @@ def merge_tube_event_occupancys(o0, o1):
             # advance e0
             i0 += 1
         else:
+            c = determine_cage(e0[2], e1[2])
+            if c is None:
+                e0[0] = e1[1]
+                i1 += 1
+                continue
             # e1 ends before e0
             if e1[0] < e0[0]:
                 # e1 is 'inside' e0
