@@ -21,7 +21,7 @@ state_weights = {
         consts.TOUCH_UNTOUCHED: 1,
     }
 }
-    
+
 
 def merge_occupancies(occupancies, cull=True):
     # merge
@@ -29,12 +29,12 @@ def merge_occupancies(occupancies, cull=True):
         occupancy = numpy.vstack(occupancies)
     else:
         occupancy = occupancies[0]
-    
+
     # sort
     occupancy = occupancy[numpy.argsort(occupancy[:, 0])]
     if not cull:
         return occupancy
-    
+
     # find conflicting
     n = len(occupancy)
     m = numpy.ones(n, dtype='bool')
@@ -43,7 +43,7 @@ def merge_occupancies(occupancies, cull=True):
             continue
         i0 = i
         o = occupancy[i]
-        
+
         i += 1
         cinds = []
         while i < n:
@@ -126,11 +126,11 @@ def measure_rfid_reads(events, board=None):
         vs = vs[0]
         # TODO recombine all boards
         return sorted(vs, key=lambda i: i['timestamp'])
-    
+
     arfids = db.sel(events, event='rfid')
     brfids = db.sel(arfids, board=board)
     bevents = db.split_events(db.sel(events, board=board), board=False)
-    
+
     data = []
     for (i, brfid) in enumerate(brfids):
         timestamp, board_id, _, animal_id, _ = brfid
@@ -149,7 +149,7 @@ def measure_rfid_reads(events, board=None):
             d['rfid']['next_board'] = None
         else:
             d['rfid']['next_board'] = brfids[i + 1, consts.TIME_COLUMN]
-        
+
         # find events for next and previous rfid for this animal
         animal_rfids = db.sel(arfids, data0=animal_id)
         for (j, a) in enumerate(animal_rfids):
@@ -166,7 +166,7 @@ def measure_rfid_reads(events, board=None):
         # (save these for reconstructing occupancy)
         # if no next/previous, use either -inf or +inf?
         # measure dt for neighbors
-        
+
         # find closest beam/touch break/touch
         sd = {}
         for evt in (consts.EVENT_BEAM, consts.EVENT_TOUCH_BINARY):
@@ -188,7 +188,7 @@ def measure_rfid_reads(events, board=None):
                     if re is not None:
                         re = re[consts.TIME_COLUMN]
                     sd[evt][side][released] = re
-                
+
                 # get times of next/previous beam/touch break/unbreak
                 # measure dt for events
         d['sensors'] = sd
@@ -196,7 +196,7 @@ def measure_rfid_reads(events, board=None):
 
         # score read by dt of events
         # generate liberal occupancy
-    
+
     # merge and remove conflicts from occupancy
     return data
 
@@ -380,7 +380,7 @@ def by_isolated_transitions(
                     [enter_time, exit_time, cage_n, i['a'], i['direction']])
     return numpy.array(occupancy), irfid_dict
 
-    
+
 def assign_direction_to_tube_events(te):
     for e in te:
         ni = len(set([i[3] for i in e['i']]))
@@ -441,7 +441,7 @@ def tube_events_to_occupancy(te):
                             a,
                             'lr'.index(e['direction'])])
                     else:
-                        # TODO assign fromt start time?
+                        # TODO assign from start time?
                         pass
                     state[a] = {'previous': e}
                 state[a]['previous'] = e
@@ -456,7 +456,7 @@ def merge_tube_event_occupancys(o0, o1):
     # conflicts could be:
     # - simultaneuous reporting of left o0 and right o1
     # - jumps from left o0 to right o1
-    
+
     # start at index 0 for each
     occupancy = []
     # get copy of arrays to allow modification during iteration

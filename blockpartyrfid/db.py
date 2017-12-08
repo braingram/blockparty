@@ -28,6 +28,15 @@ def sel(vs, board=None, event=None, data0=None, data1=None, timerange=None):
     return vs[m]
 
 
+def remap_ids(evs, rmap):
+    # rmap: {old key: new key...}
+    for k in rmap:
+        evs[
+            (evs[:, consts.DATA0_COLUMN] == k) &
+            (evs[:, consts.EVENT_COLUMN] == consts.EVENT_RFID),
+            consts.DATA0_COLUMN] = rmap[k]
+
+
 def _reduce_dict(d):
     if isinstance(d, (list, tuple, numpy.ndarray)):
         return d
@@ -252,7 +261,8 @@ def generate_overlap_map(le, re, ie, margin=None):
 
 
 def find_tube_events(
-        board_events, margin=None, min_duration=None, remove_conflicts=True):
+        board_events, margin=None, min_duration=None,
+        ignore_tails=True, remove_conflicts=True):
     if len(numpy.unique(board_events[:, consts.BOARD_COLUMN])) != 1:
         raise Exception("Only works for 1 board")
     # find left/right beam events
@@ -274,11 +284,13 @@ def find_tube_events(
         # for each index in right, find 'neighbors'
         inds = find_neighbors(ri, 'r', omap)
         inds['r'].append(ri)
+        for k in inds:
+            inds[k].sort()
         [visited.add(ri) for ri in inds['r']]
-        
+
         if len(inds['l']) == 0:
             continue
-        
+
         # find start/end times
         st = ed['r'][ri][0]
         et = ed['r'][ri][1]
@@ -304,10 +316,13 @@ def find_tube_events(
         for k in 'lri':
             te[k] = numpy.array([ed[k][i] for i in inds[k]])
         tube_events.append(te)
+    if ignore_tails:
+        assign_direction_ignoring_tails(tube_events)
     if remove_conflicts:
         unassign_conflicting_tube_event_directions(tube_events)
     return tube_events
-    
+
+
 def unassign_conflicting_tube_event_directions(te):
     state = {}
     cs = []
@@ -316,15 +331,31 @@ def unassign_conflicting_tube_event_directions(te):
             for a in state:
                 state[a] = '?'
             continue
-        conflict = False
+        # conflict = False
         for a in e['animals']:
             if a in state and state[a] == e['direction']:  # conflict
-                conflict = True
+                # conflict = True
                 cs.append(i)
             state[a] = e['direction']
-        #if conflict:
-        #    e['direction'] = '?'
-        #    for a in state:
-        #        state[a] = '?'
+        # if conflict:
+        #     e['direction'] = '?'
+        #     for a in state:
+        #         state[a] = '?'
     for c in cs:
         te[c]['direction'] = '?'
+
+
+def assign_direction_ignoring_tails(te):
+    for e in te:
+        if e['direction'] != '?':
+            continue
+        # don't apply this to >1 animal events
+        if len(e['animals']) > 1:
+            continue
+        if (
+                numpy.all(e['l'][1:, 2] < e['l'][0, 2] / 2.) and
+                numpy.all(e['r'][1:, 2] < e['r'][0, 2] / 2.)):
+            if e['l'][0, 0] < e['r'][0, 0]:
+                e['direction'] = 'r'
+            else:
+                e['direction'] = 'l'
