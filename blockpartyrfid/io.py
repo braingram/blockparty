@@ -43,7 +43,7 @@ def load_log(log_filename):
     # 3: data0
     # 4: data1
     vs = numpy.loadtxt(
-        log_filename, delimiter=',', converters={3: dc, 4: dc}).astype('int')
+        log_filename, delimiter=',', converters={3: dc, 4: dc}, dtype='int64')
     return vs
 
 
