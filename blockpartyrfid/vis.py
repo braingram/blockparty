@@ -16,7 +16,23 @@ default_cm = pylab.cm.spring
 #    default_cm = pylab.cm.winter
 
 
-def plot_rfid_events(events, timerange=None, ymin=-0.5, ymax=0.5, color='k'):
+def plot_rfid_events(
+        events, timerange=None, ymin=-0.5, ymax=0.5, color='k',
+        label=False, animals=None):
+    rfid = db.sel(events, event='rfid', timerange=timerange, data1=0)
+    if len(rfid) == 0:
+        return
+    if animals is None:
+        animals = numpy.unique(rfid[:, consts.DATA0_COLUMN])
+    na = animals.size
+    cs = numpy.arange(na) / (na - 1.)
+    for (a, c) in zip(animals, cs):
+        c = pylab.cm.jet(c)
+        ae = db.sel(rfid, data0=a)
+        if len(ae) == 0:
+            continue
+        pylab.vlines(ae[:, consts.TIME_COLUMN], ymin, ymax, color=c)
+    return
     rfid = db.sel(events, event='rfid', timerange=timerange)
     if len(rfid) == 0:
         return
@@ -40,11 +56,12 @@ def plot_rfid_events(events, timerange=None, ymin=-0.5, ymax=0.5, color='k'):
     pylab.barh(b, w, h, l, color='pink')
 
     rfid_y = (ymin + ymax) * 0.5
-    for ev in rfid[idi]:
-        pylab.text(
-            ev[consts.TIME_COLUMN],
-            rfid_y, '%s' % ev[consts.RFID_ID_COLUMN],
-            color='k')
+    if not label:
+        for ev in rfid[idi]:
+            pylab.text(
+                ev[consts.TIME_COLUMN],
+                rfid_y, '%s' % ev[consts.RFID_ID_COLUMN],
+                color='k')
 
 
 def plot_beam_events(
@@ -85,16 +102,20 @@ def plot_touch_raw_events(
         where='post', color=color)
 
 
-def plot_events(events, timerange=None, event_types=None, offset=0.0):
+def plot_events(
+        events, timerange=None, event_types=None, offset=0.0, animals=None):
     # TODO split boards
     bids = db.all_boards(events)
     if len(bids) > 1:
+        aids = db.all_animals(events)
         for (i, bid) in enumerate(bids):
             plot_events(
                 db.sel(events, board=bid),
                 timerange=timerange, event_types=event_types,
-                offset=i * 7)
+                offset=i * 7, animals=aids)
         return
+    if animals is None:
+        animals = db.all_animals(events)
     if event_types is None:
         #event_types = ['rfid', 'beam', 'touch_binary', 'touch_raw']
         event_types = ['rfid', 'beam', 'touch_binary']
@@ -104,7 +125,7 @@ def plot_events(events, timerange=None, event_types=None, offset=0.0):
     if 'rfid' in event_types:
         plot_rfid_events(
             events, ymin=offset - 0.5, ymax=offset + 0.5,
-            timerange=timerange)
+            timerange=timerange, animals=animals)
     if 'beam' in event_types:
         plot_beam_events(
             events, side='l', timerange=timerange, offset=offset - 1.5)
@@ -244,12 +265,22 @@ def plot_occupancy2(
 
 
 def plot_tube_event(e, evs=None, margin=None, offset=0.0):
+    pylab.title(
+        "%s direction, %s animals" % (e['direction'], len(e['animals'])))
     pylab.barh(
         numpy.ones(len(e['l'])) * -1.5 + offset,
         e['l'][:, 2], 1.0, e['l'][:, 0], color='b', alpha=0.5)
     pylab.barh(
         numpy.ones(len(e['r'])) * 0.5 + offset,
         e['r'][:, 2], 1.0, e['r'][:, 0], color='b', alpha=0.5)
+    na = max(2, len(e['animals']))
+    for (i, a) in enumerate(e['animals']):
+        c = pylab.cm.jet(i / (na - 1.))
+        pylab.vlines(
+            e['i'][e['i'][:, 3] == a, 0], -0.5, 0.5,
+            color=c, linewidth=3)
+        ft = e['i'][e['i'][:, 3] == a, 0][0]
+        pylab.text(ft + 10, 0.5, str(a), rotation=90, color=c)
     for l in e['l']:
         pylab.text(l[0], -1 + offset, str(l[2]))
     for r in e['r']:
@@ -265,3 +296,42 @@ def plot_tube_event(e, evs=None, margin=None, offset=0.0):
     yl = pylab.ylim()
     if yl[1] - yl[0] == 3:
         pylab.ylim(yl[0] - 0.5, yl[1] + 0.5)
+    # show images
+    if 'ims' in e and len(e['ims']) != 0:
+        bf = pylab.gcf()
+        # draw markers for each image
+        ts = sorted(e['ims'].keys())
+        ax = pylab.gca()
+        sc = pylab.scatter(
+            ts, numpy.ones(len(ts)) * 1.5,
+            s=200, color='k', picker=5)
+
+        nf = pylab.figure()
+        fn = e['ims'][ts[0]]
+        im_obj = pylab.imshow(pylab.imread(fn))
+        pylab.title(fn)
+        im_obj.last_i = 0
+        # when hover over marker, update image
+
+        def on_motion(event):
+            if event.inaxes != ax:
+                return
+            cont, ind = sc.contains(event)
+            if not cont:
+                return
+            i = ind['ind'][0]
+            if i != im_obj.last_i:
+                fn = e['ims'][ts[i]]
+                im_obj.set_data(pylab.imread(e['ims'][ts[i]]))
+                im_obj.last_i = i
+                pylab.title(fn)
+                nf.canvas.draw()
+
+        def on_keypress(event):
+            if event.key == 'q':
+                pylab.close(bf)
+                pylab.close(nf)
+
+        bf.canvas.mpl_connect('motion_notify_event', on_motion)
+        bf.canvas.mpl_connect('key_press_event', on_keypress)
+        nf.canvas.mpl_connect('key_press_event', on_keypress)

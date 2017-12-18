@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 
+import os
+
 import numpy
 
 from . import consts
+from . import io
 
 
 def sel(vs, board=None, event=None, data0=None, data1=None, timerange=None):
@@ -84,7 +87,8 @@ def all_boards(vs):
 
 
 def all_animals(vs):
-    return numpy.unique(sel(vs, event='rfid')[:, consts.RFID_ID_COLUMN])
+    return numpy.unique(
+        sel(vs, event='rfid', data1=0)[:, consts.RFID_ID_COLUMN])
 
 
 def by_animal(events):
@@ -359,3 +363,15 @@ def assign_direction_ignoring_tails(te):
                 e['direction'] = 'r'
             else:
                 e['direction'] = 'l'
+
+
+def assign_images_to_tube_events(te, image_directory):
+    ims = io.get_images(image_directory)
+    for e in te:
+        st, et = e['start'], e['end']
+        eims = ims[(ims['t'] >= st) & (ims['t'] <= et)]
+        e['ims'] = {}
+        eims = eims[numpy.argsort(eims['t'])]
+        for eim in eims:
+            fn = os.path.join(image_directory, eim['fn'])
+            e['ims'][eim['t']] = fn
