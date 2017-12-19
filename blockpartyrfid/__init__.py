@@ -2,7 +2,7 @@
 
 from . import io
 from . import occupancy
-from . import touch
+#from . import touch
 from . import vis
 
-__all__ = ['io', 'occupancy', 'touch', 'vis']
+__all__ = ['io', 'occupancy', 'vis']

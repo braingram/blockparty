@@ -4,7 +4,7 @@ import os
 
 import numpy
 
-from . import touch
+#from . import touch
 
 
 def get_images(image_directory):
