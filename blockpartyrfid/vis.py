@@ -277,10 +277,10 @@ def plot_tube_event(e, evs=None, margin=None, offset=0.0):
     for (i, a) in enumerate(e['animals']):
         c = pylab.cm.jet(i / (na - 1.))
         pylab.vlines(
-            e['i'][e['i'][:, 3] == a, 0], -0.5, 0.5,
+            e['i'][e['i'][:, 3] == a, 0], -0.5 + offset, 0.5 + offset,
             color=c, linewidth=3)
         ft = e['i'][e['i'][:, 3] == a, 0][0]
-        pylab.text(ft + 10, 0.5, str(a), rotation=90, color=c)
+        pylab.text(ft + 10, 0.5 + offset, str(a), rotation=90, color=c)
     for l in e['l']:
         pylab.text(l[0], -1 + offset, str(l[2]))
     for r in e['r']:
@@ -303,12 +303,12 @@ def plot_tube_event(e, evs=None, margin=None, offset=0.0):
         ts = sorted(e['ims'].keys())
         ax = pylab.gca()
         sc = pylab.scatter(
-            ts, numpy.ones(len(ts)) * 1.5,
+            ts, numpy.ones(len(ts)) * 1.5 + offset,
             s=200, color='k', picker=5)
 
         nf = pylab.figure()
         fn = e['ims'][ts[0]]
-        im_obj = pylab.imshow(pylab.imread(fn))
+        im_obj = pylab.imshow(pylab.imread(fn)[::-1, ::-1])
         pylab.title(fn)
         im_obj.last_i = 0
         # when hover over marker, update image
@@ -322,9 +322,9 @@ def plot_tube_event(e, evs=None, margin=None, offset=0.0):
             i = ind['ind'][0]
             if i != im_obj.last_i:
                 fn = e['ims'][ts[i]]
-                im_obj.set_data(pylab.imread(e['ims'][ts[i]]))
+                im_obj.set_data(pylab.imread(e['ims'][ts[i]])[::-1, ::-1])
                 im_obj.last_i = i
-                pylab.title(fn)
+                nf.axes[0].set_title(fn)
                 nf.canvas.draw()
 
         def on_keypress(event):

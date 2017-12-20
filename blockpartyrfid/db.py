@@ -311,9 +311,11 @@ def find_tube_events(
                 direction = 'r'
             else:
                 direction = 'l'
+        duration = et - st
         te = {
             'start': st,
             'end': et,
+            'duration': duration,
             'animals': set([ed['i'][i][3] for i in inds['i']]),
             'direction': direction,
         }
