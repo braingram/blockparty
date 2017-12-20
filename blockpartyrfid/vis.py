@@ -139,7 +139,8 @@ def plot_events(
 
 
 def plot_time_in_cage(
-        occupancy, animals=None, n_cages=None, full_time=None, cm=None):
+        occupancy, animals=None, n_cages=None, full_time=None, cm=None,
+        as_hex=True):
     if animals is None:
         aids = numpy.unique(occupancy[:, 3])
         aids.sort()
@@ -168,7 +169,10 @@ def plot_time_in_cage(
         pylab.subplot(spb + i)
         pylab.pie(
             cts, labels=blabels, autopct='%1.1f%%', colors=colors)
-        pylab.title(aid)
+        if as_hex:
+            pylab.title(hex(aid))
+        else:
+            pylab.title(aid)
 
 
 def plot_occupancy(
@@ -265,8 +269,10 @@ def plot_occupancy2(
 
 
 def plot_tube_event(e, evs=None, margin=None, offset=0.0):
-    pylab.title(
-        "%s direction, %s animals" % (e['direction'], len(e['animals'])))
+    tt = "%s direction, %s animals" % (e['direction'], len(e['animals']))
+    if 'board' in e:
+        tt += " board %s" % e['board']
+    pylab.title(tt)
     pylab.barh(
         numpy.ones(len(e['l'])) * -1.5 + offset,
         e['l'][:, 2], 1.0, e['l'][:, 0], color='b', alpha=0.5)

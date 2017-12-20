@@ -267,8 +267,10 @@ def generate_overlap_map(le, re, ie, margin=None):
 def find_tube_events(
         board_events, margin=None, min_duration=None,
         ignore_tails=True, remove_conflicts=True):
-    if len(numpy.unique(board_events[:, consts.BOARD_COLUMN])) != 1:
+    boards = numpy.unique(board_events[:, consts.BOARD_COLUMN])
+    if len(boards) != 1:
         raise Exception("Only works for 1 board")
+    board = boards[0]
     # find left/right beam events
     lbe = beam_events_to_duration(
         sel(board_events, event='beam', data0=consts.BEAM_LEFT), min_duration)
@@ -315,12 +317,15 @@ def find_tube_events(
         te = {
             'start': st,
             'end': et,
+            'board': board,
             'duration': duration,
             'animals': set([ed['i'][i][3] for i in inds['i']]),
             'direction': direction,
         }
         for k in 'lri':
             te[k] = numpy.array([ed[k][i] for i in inds[k]])
+        if len(te['animals']) == 0:
+            continue
         tube_events.append(te)
     if ignore_tails:
         assign_direction_ignoring_tails(tube_events)
@@ -377,3 +382,184 @@ def assign_images_to_tube_events(te, image_directory):
         for eim in eims:
             fn = os.path.join(image_directory, eim['fn'])
             e['ims'][eim['t']] = fn
+
+            
+def h0(e):
+    """1 animal, 1 left, 1 right, rising & falling edges agree"""
+    lvl = 0
+    if len(e['animals']) != 1:
+        return lvl, False, None
+    if len(e['l']) != 1 or len(e['r']) != 1:
+        return lvl, False, None
+    l, r = e['l'][0], e['r'][0]
+    if l[0] < r[0] and l[1] < r[1]:
+        return lvl, True, 'r'
+    if l[0] > r[0] and l[1] > r[1]:
+        return lvl, True, 'l'
+    return lvl, False, None
+    
+    if e['duration'] > 1500:  # use falling edge
+        return lvl, False, NOne
+    if l[0] < r[0]:
+        if l[1] < r[1]:
+            return lvl, True, 'r'
+        return lvl, False, None
+    if l[1] > r[1]:
+        return lvl, True, 'l'
+    return lvl, False, None
+ 
+ 
+def h1(e):
+    """1 animal, 1 left, 1 right, rising & falling edges disagree"""
+    lvl, valid, direction = h0(e)
+    if valid:
+        return lvl, valid, direction
+    lvl = 1
+    if len(e['animals']) != 1:
+        return lvl, False, None
+    if len(e['l']) != 1 or len(e['r']) != 1:
+        return lvl, False, None
+    l, r = e['l'][0], e['r'][0]
+    if e['duration'] < 1500:  # use rising edge
+        if l[0] < r[0]:
+            return lvl, True, 'r'
+        return lvl, True, 'l'
+    # else use falling edge
+    if l[1] < r[1]:
+        return lvl, True, 'r'
+    return lvl, True, 'l'
+
+
+def h2(e):
+    """>1 animal, 1 left or 1 right, agree"""
+    lvl, valid, direction = h1(e)
+    if valid:
+        return lvl, valid, direction
+    lvl = 2
+    if len(e['animals']) < 2:
+        return lvl, False, None
+    if len(e['l']) != 1 or len(e['r']) != 1:
+        return lvl, False, None
+    l, r = e['l'][0], e['r'][0]
+    if l[0] < r[0] and l[1] < r[1]:
+        return lvl, True, 'r'
+    if l[0] > r[0] and l[1] > r[1]:
+        return lvl, True, 'l'
+    return lvl, False, None
+    
+    if e['duration'] > 1500:  # use falling edge
+        return lvl, False, None
+    if l[0] < r[0]:
+        if l[1] < r[1]:
+            return lvl, True, 'r'
+        return lvl, False, None
+    if l[1] > r[1]:
+        return lvl, True, 'l'
+    return lvl, False, None
+
+    
+def h3(e):
+    """>1 animal, 1 left or 1 right, disagree"""
+    lvl, valid, direction = h2(e)
+    if valid:
+        return lvl, valid, direction
+    lvl = 3
+    if len(e['animals']) < 2:
+        return lvl, False, None
+    if len(e['l']) != 1 or len(e['r']) != 1:
+        return lvl, False, None
+    l, r = e['l'][0], e['r'][0]
+    if e['duration'] < 1500:  # use rising edge
+        if l[0] < r[0]:
+            return lvl, True, 'r'
+        return lvl, True, 'l'
+    # else use falling edge
+    if l[1] < r[1]:
+        return lvl, True, 'r'
+    return lvl, True, 'l'
+
+
+def h4(e):
+    """1 animal, >1 left, >1 right"""
+    lvl, valid, direction = h3(e)
+    if valid:
+        return lvl, valid, direction
+    lvl = 4
+    if len(e['animals']) != 1:
+        return lvl, False, None
+    # TODO don't assign to duration > 10 seconds?
+    # 1) do leading and trailing edges agree
+    ls, rs = e['l'], e['r']
+    if ls[0][0] < rs[0][0] and ls[-1][1] < rs[-1][1]:
+        return lvl, True, 'r'
+    if ls[0][0] > rs[0][0] and ls[-1][0] > rs[-1][1]:
+        return lvl, True, 'l'
+    # 2) if there is 1 left or 1 right, try to find tail of other one
+    body = None
+    if len(ls) == 1:
+        # left is body, right is body + tail(s)
+        # find right with closest duration
+        l = ls[0]
+        body = l[2]
+        r = rs[numpy.argmin(numpy.abs(rs[:, 2] - l[2]))]
+        if l[0] < r[0] and l[1] < r[1]:
+            return lvl, True, 'r'
+        if l[0] > r[0] and l[1] > r[1]:
+            return lvl, True, 'l'
+        # if e['duration'] < 1500:  
+    if len(rs) == 1:
+        # right is body, left is body + tails(s)
+        r = rs[0]
+        body = r[2]
+        l = ls[numpy.argmin(numpy.abs(ls[:, 2] - r[2]))]
+        if l[0] < r[0] and l[1] < r[1]:
+            return lvl, True, 'r'
+        if l[0] > r[0] and l[1] > r[1]:
+            return lvl, True, 'l'
+    # 3) still no agreement, use falling edges that aren't tails
+    if body is None:
+        # find body
+        body = max((rs[:, 2].max(), ls[:, 2].max()))
+    li = len(ls) - 1
+    ri = len(rs) - 1
+    while li > 0:
+        if ls[li, 2] > body / 2.:
+            break
+        li -= 1
+    while ri > 0:
+        if rs[ri, 2] > body / 2.:
+            break
+        ri -= 1
+    if ls[li, 1] < rs[ri, 1]:
+        return lvl, True, 'r'
+    return lvl, True, 'l'
+
+
+def h5(e):
+    """>1 animal, >1 left, >1 right"""
+    lvl, valid, direction = h4(e)
+    if valid:
+        return lvl, valid, direction
+    lvl = 5
+    if len(e['animals']) < 2:
+        return lvl, False, None
+    # check if first rising edge and last falling edge agree
+    ls, rs = e['l'], e['r']
+    if ls[0][0] < rs[0][0] and ls[-1][1] < rs[-1][1]:
+        return lvl, True, 'r'
+    if ls[0][0] > rs[0][0] and ls[-1][1] > rs[-1][1]:
+        return lvl, True, 'l'
+    # try to split into single events, if so parse them
+    # when splitting, is 1 beam break about the sum of the other two
+    # if not, parse as 1 event similar to h4
+    return lvl, False, None
+ 
+ 
+def apply_heuristics(tube_events):
+    for e in tube_events:
+        lvl, valid, direction = h5(e)
+        if not valid:
+            direction = '?'
+        e['heuristic'] = {
+            'level': lvl, 'valid': valid, 'direction': direction,
+        }
