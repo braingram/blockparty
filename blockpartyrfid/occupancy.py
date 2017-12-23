@@ -559,3 +559,67 @@ def merge_tube_event_occupancys(o0, o1, animal=None):
             i1 += 1
     # TODO finish out events
     return numpy.array(occupancy)
+
+
+def from_tube_sequence(rfid_reads):
+    # find first 0->1 or 1->0 or 1->2 or 2->1...?
+    # if 0->1, was in cage 1 between, now in cage 2
+    #   if next is 0, invalid!
+    #   if next is 1, moved to cage 1
+    #   if next is 2, moved to cage 3
+    # if 1->0, was in cage 1 between, now in cage 0
+    #   if next is 0, moved to cage 1
+    #   if next is 1, invalid!
+    # valid tubes are cage - 1 or cage
+    starts = []
+    n = len(rfid_reads)
+    for i in range(n-1):
+        if abs(rfid_reads[i, 1] - rfid_reads[i+1, 1]) == 1:
+            # moved cages
+            starts.append({
+                'i': i,
+                'cage': max(rfid_reads[i, 1], rfid_reads[i+1, 1]),
+                'start': rfid_reads[i, 0],
+                'end': rfid_reads[i+1, 0],
+                'forward_chain': [],
+                'backward_chain': [],
+            })
+    # for each start, trace out the sequence of cages
+    for start in starts:
+        i = start['i']
+        cage = start['cage']
+        chain = start['forward_chain']
+        # at start['i'] animal entered start['cage']
+        # trace forward (until next start, or end)
+        i += 1
+        while i < n - 1:
+            r = rfid_reads[i]
+            tube = r[1]
+            if tube == cage:
+                cage += 1
+            elif tube == (cage - 1):
+                cage -= 1
+            else:
+                # invalid move
+                break
+            chain.append((i, cage))
+            i += 1
+        i = start['i']
+        cage = start['cage']
+        chain = start['backward_chain']
+        i -= 1
+        # trace backward (until previous start, or beginning)
+        while i >= 0:
+            break  # TODO
+            r = rfid_reads[i]
+            tube = r[1]
+            if tube == cage:
+                cage += 1
+            elif tube == cage - 1:
+                cage -= 1
+            else:
+                # invalid move
+                break
+            chain.append((i, cage))
+            i -= 1
+    return starts
