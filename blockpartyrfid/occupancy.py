@@ -572,6 +572,7 @@ def from_tube_sequence(rfid_reads):
     #   if next is 1, invalid!
     # valid tubes are cage - 1 or cage
     starts = []
+    start_i = {}
     n = len(rfid_reads)
     for i in range(n-1):
         if abs(rfid_reads[i, 1] - rfid_reads[i+1, 1]) == 1:
@@ -584,6 +585,7 @@ def from_tube_sequence(rfid_reads):
                 'forward_chain': [],
                 'backward_chain': [],
             })
+            start_i[i] = starts[-1]
     # for each start, trace out the sequence of cages
     for start in starts:
         i = start['i']
@@ -602,15 +604,16 @@ def from_tube_sequence(rfid_reads):
             else:
                 # invalid move
                 break
+            if i in start_i:
+                if cage != start_i[i]['cage']:
+                    break
             chain.append((i, cage))
             i += 1
         i = start['i']
         cage = start['cage']
         chain = start['backward_chain']
-        i -= 1
         # trace backward (until previous start, or beginning)
-        while i >= 0:
-            break  # TODO
+        while i >= 1:
             r = rfid_reads[i]
             tube = r[1]
             if tube == cage:
@@ -620,6 +623,6 @@ def from_tube_sequence(rfid_reads):
             else:
                 # invalid move
                 break
-            chain.append((i, cage))
+            chain.append((i - 1, cage))
             i -= 1
     return starts
