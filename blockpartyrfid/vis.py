@@ -9,7 +9,7 @@ from . import consts
 from . import db
 
 
-default_cm = pylab.cm.spring
+default_cm = pylab.cm.Paired
 #if hasattr(pylab.cm, 'viridis'):
 #    default_cm = pylab.cm.viridis
 #else:
