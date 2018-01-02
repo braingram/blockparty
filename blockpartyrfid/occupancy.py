@@ -626,3 +626,38 @@ def from_tube_sequence(rfid_reads):
             chain.append((i - 1, cage))
             i -= 1
     return starts
+
+
+def merge_sequences(sequences):
+    od = {}
+    for si in sequences:
+        for i in si['forward_chain'] + si['backward_chain']:
+            od[i[0]] = od.get(i[0], []) + [i[1], ]
+    for i in od:
+        l = list(set(od[i]))
+        if len(l) == 1:
+            od[i] = l[0]
+        else:
+            od[i] = l
+    for si in sequences:
+        od[si['i']] = si['cage']
+    return od
+
+
+def merged_sequence_to_occupancy(sequence, reads):
+    animal = list(set(reads[:, consts.RFID_ID_COLUMN]))
+    if len(animal) != 1:
+        raise Exception
+    animal = animal[0]
+    inds = numpy.array(sorted(sequence.keys()))
+    # [start, end, cage, animal, direction?]
+    occupancy = []
+    # cage from inds[i] to inds[i+1]
+    for (i, ind) in enumerate(inds[:-1]):
+        c = sequence[i]
+        if isinstance(c, list):
+            continue
+        st = reads[ind, 0]
+        et = reads[inds[i + 1], 0]
+        occupancy.append([st, et, c, animal, 0])
+    return numpy.array(occupancy)

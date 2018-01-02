@@ -341,3 +341,34 @@ def plot_tube_event(e, evs=None, margin=None, offset=0.0):
         bf.canvas.mpl_connect('motion_notify_event', on_motion)
         bf.canvas.mpl_connect('key_press_event', on_keypress)
         nf.canvas.mpl_connect('key_press_event', on_keypress)
+
+
+def plot_sequence_chain(s, offset=0):
+    for (i, ss) in enumerate(s):
+        for k in ('forward_chain', 'backward_chain'):
+            if not len(ss[k]):
+                continue
+            arr = numpy.array(ss[k])
+            pylab.plot(arr[:, 0], arr[:, 1] + offset)
+
+
+def plot_merged_sequence(s, offset=0, by_time=False, reads=None, plot_func=pylab.step, **kwargs):
+    if by_time and reads is None:
+        raise Exception("Must supply reads if plotting by time")
+    inds = numpy.array(sorted(s.keys()))
+    if by_time:
+        xs = reads[inds, 0]
+    else:
+        xs = inds
+    # ys
+    ys = []
+    for i in inds:
+        if isinstance(s[i], list):
+            ys.append(numpy.nan)
+        else:
+            ys.append(s[i])
+    ys = numpy.array(ys)
+    if plot_func == pylab.step:
+        if 'where' not in kwargs:
+            kwargs['where'] = 'post'
+    plot_func(xs, ys + offset, **kwargs)

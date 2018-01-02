@@ -563,3 +563,9 @@ def apply_heuristics(tube_events):
         e['heuristic'] = {
             'level': lvl, 'valid': valid, 'direction': direction,
         }
+
+
+def merge_close_reads(reads, threshold=1000):
+    m = numpy.ones(len(reads), dtype='bool')
+    m[1:] = numpy.diff(reads[:, 0]) > threshold
+    return reads[m]
