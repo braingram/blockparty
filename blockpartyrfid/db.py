@@ -383,7 +383,7 @@ def assign_images_to_tube_events(te, image_directory):
             fn = os.path.join(image_directory, eim['fn'])
             e['ims'][eim['t']] = fn
 
-            
+
 def h0(e):
     """1 animal, 1 left, 1 right, rising & falling edges agree"""
     lvl = 0
@@ -397,9 +397,9 @@ def h0(e):
     if l[0] > r[0] and l[1] > r[1]:
         return lvl, True, 'l'
     return lvl, False, None
-    
+
     if e['duration'] > 1500:  # use falling edge
-        return lvl, False, NOne
+        return lvl, False, None
     if l[0] < r[0]:
         if l[1] < r[1]:
             return lvl, True, 'r'
@@ -407,8 +407,8 @@ def h0(e):
     if l[1] > r[1]:
         return lvl, True, 'l'
     return lvl, False, None
- 
- 
+
+
 def h1(e):
     """1 animal, 1 left, 1 right, rising & falling edges disagree"""
     lvl, valid, direction = h0(e)
@@ -446,7 +446,7 @@ def h2(e):
     if l[0] > r[0] and l[1] > r[1]:
         return lvl, True, 'l'
     return lvl, False, None
-    
+
     if e['duration'] > 1500:  # use falling edge
         return lvl, False, None
     if l[0] < r[0]:
@@ -457,7 +457,7 @@ def h2(e):
         return lvl, True, 'l'
     return lvl, False, None
 
-    
+
 def h3(e):
     """>1 animal, 1 left or 1 right, disagree"""
     lvl, valid, direction = h2(e)
@@ -506,7 +506,7 @@ def h4(e):
             return lvl, True, 'r'
         if l[0] > r[0] and l[1] > r[1]:
             return lvl, True, 'l'
-        # if e['duration'] < 1500:  
+        # if e['duration'] < 1500:
     if len(rs) == 1:
         # right is body, left is body + tails(s)
         r = rs[0]
@@ -553,8 +553,8 @@ def h5(e):
     # when splitting, is 1 beam break about the sum of the other two
     # if not, parse as 1 event similar to h4
     return lvl, False, None
- 
- 
+
+
 def apply_heuristics(tube_events):
     for e in tube_events:
         lvl, valid, direction = h5(e)
@@ -566,6 +566,8 @@ def apply_heuristics(tube_events):
 
 
 def merge_close_reads(reads, threshold=1000):
+    # keep cross board reads
     m = numpy.ones(len(reads), dtype='bool')
     m[1:] = numpy.diff(reads[:, 0]) > threshold
+    m[1:] |= numpy.diff(reads[:, 1] != 0)
     return reads[m]

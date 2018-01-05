@@ -630,9 +630,23 @@ def from_tube_sequence(rfid_reads):
 
 def merge_sequences(sequences):
     od = {}
-    for si in sequences:
-        for i in si['forward_chain'] + si['backward_chain']:
-            od[i[0]] = od.get(i[0], []) + [i[1], ]
+    hits = 0
+    for si in xrange(len(sequences)):
+        s = sequences[si]
+        if si != len(sequences) - 1:
+            n = sequences[si + 1]
+            # only count hits
+            if (n['i'], n['cage']) in s['forward_chain']:
+                hits += 1
+                for i in s['forward_chain']:
+                    od[i[0]] = od.get(i[0], []) + [i[1], ]
+        if si != 0:
+            p = sequences[si - 1]
+            if (p['i'], p['cage']) in s['backward_chain']:
+                for i in s['backward_chain']:
+                    od[i[0]] = od.get(i[0], []) + [i[1], ]
+    # compute reliability score
+    reliability = hits / float(len(sequences) - 1)
     for i in od:
         l = list(set(od[i]))
         if len(l) == 1:
@@ -641,7 +655,7 @@ def merge_sequences(sequences):
             od[i] = l
     for si in sequences:
         od[si['i']] = si['cage']
-    return od
+    return od, reliability
 
 
 def merged_sequence_to_occupancy(sequence, reads):
