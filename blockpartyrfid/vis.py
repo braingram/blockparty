@@ -343,16 +343,18 @@ def plot_tube_event(e, evs=None, margin=None, offset=0.0):
         nf.canvas.mpl_connect('key_press_event', on_keypress)
 
 
-def plot_sequence_chain(s, offset=0):
+def plot_sequence_chain(s, offset=0, chain_offset=0):
     for (i, ss) in enumerate(s):
         for k in ('forward_chain', 'backward_chain'):
             if not len(ss[k]):
                 continue
             arr = numpy.array(ss[k])
-            pylab.plot(arr[:, 0], arr[:, 1] + offset)
+            pylab.plot(arr[:, 0], arr[:, 1] + offset + chain_offset * i)
 
 
-def plot_merged_sequence(s, offset=0, by_time=False, reads=None, plot_func=pylab.step, **kwargs):
+def plot_merged_sequence(
+        s, offset=0, by_time=False, reads=None,
+        plot_func=pylab.step, **kwargs):
     if by_time and reads is None:
         raise Exception("Must supply reads if plotting by time")
     inds = numpy.array(sorted(s.keys()))

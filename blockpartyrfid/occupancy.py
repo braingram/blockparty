@@ -659,6 +659,7 @@ def merge_sequences(sequences):
 
 
 def merged_sequence_to_occupancy(sequence, reads):
+    # sequence: dict with key = read index, value = cage
     animal = list(set(reads[:, consts.RFID_ID_COLUMN]))
     if len(animal) != 1:
         raise Exception
@@ -668,7 +669,7 @@ def merged_sequence_to_occupancy(sequence, reads):
     occupancy = []
     # cage from inds[i] to inds[i+1]
     for (i, ind) in enumerate(inds[:-1]):
-        c = sequence[i]
+        c = sequence[ind]
         if isinstance(c, list):
             continue
         st = reads[ind, 0]
