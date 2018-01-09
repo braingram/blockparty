@@ -214,7 +214,8 @@ def plot_occupancy(
         l = numpy.ones_like(ao[:, 1] - ao[:, 0]) * i * bar_height + offset
         pylab.barh(
             l, ao[:, 1] - ao[:, 0],
-            bar_height, ao[:, 0], color=cs)
+            bar_height, ao[:, 0], color=cs,
+            linewidth=0)
 
     yl = pylab.ylim()
     ylmin = min(yl[0], offset)
