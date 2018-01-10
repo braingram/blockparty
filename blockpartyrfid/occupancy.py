@@ -721,8 +721,8 @@ def generate_chase_matrix(multi_animal_events, board=None, animals=None):
     for e in multi_animal_events:
         if not tb(e['board']):
             continue
-        chaser = e['animals'][0]
-        chased = e['animals'][1:]
+        chaser = e['animals'][-1]
+        chased = e['animals'][:-1][::-1]
         if chaser not in chase_dict:
             chase_dict[chaser] = {}
         for c in chased:
