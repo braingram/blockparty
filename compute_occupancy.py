@@ -53,23 +53,25 @@ if rfid_merge_threshold is None:
         rfid_merge_threshold = min(rfid_merge_threshold, cbdt.min())
 print("Using rfid_merge_threshold: %s" % rfid_merge_threshold)
 
-fad = {}
+rfid_reads = {}
 raw_sequences = {}
 sequences = {}
 occupancy = {}
 for a in animals:
     # merge close rfid reads
-    fad[a] = blockpartyrfid.db.merge_close_reads(ad[a], rfid_merge_threshold)
+    rfid_reads[a] = blockpartyrfid.db.merge_close_reads(
+        ad[a], rfid_merge_threshold)
 
     # compute tube sequences
-    raw_sequences[a] = blockpartyrfid.occupancy.from_tube_sequence(fad[a])
+    raw_sequences[a] = blockpartyrfid.occupancy.from_tube_sequence(
+        rfid_reads[a])
 
     # merge to a single sequence
     sequences[a] = blockpartyrfid.occupancy.merge_sequences(raw_sequences[a])
 
     # convert sequence to occupancy
     occupancy[a] = blockpartyrfid.occupancy.merged_sequence_to_occupancy(
-        sequences[a][0], fad[a])
+        sequences[a][0], rfid_reads[a])
 
 # merge occupancies from all animals
 o = blockpartyrfid.occupancy.merge_occupancies(occupancy.values())

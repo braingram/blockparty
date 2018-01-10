@@ -676,3 +676,67 @@ def merged_sequence_to_occupancy(sequence, reads):
         et = reads[inds[i + 1], 0]
         occupancy.append([st, et, c, animal, 0])
     return numpy.array(occupancy)
+
+
+def find_multi_animal_events(rfid_reads, threshold):
+    reads = numpy.vstack(rfid_reads.values())
+    reads = reads[reads[:, consts.TIME_COLUMN].argsort()]
+    boards = numpy.unique(reads[:, consts.BOARD_COLUMN])
+    maes = []
+    for board in boards:
+        br = reads[reads[:, consts.BOARD_COLUMN] == board]
+        starts = numpy.where(
+            numpy.diff(br[:, consts.TIME_COLUMN]) < threshold)[0]
+        n = len(reads)
+        used = []
+        for start in starts:
+            if start in used:
+                continue
+            # find all contributing events
+            index = start + 1
+            used.append(start)
+            while index < n:
+                if (
+                        br[index, consts.TIME_COLUMN] -
+                        br[index - 1, consts.TIME_COLUMN] < threshold):
+                    used.append(index)
+                    index += 1
+                else:
+                    break
+            evs = br[start:index]
+            maes.append({
+                'times': evs[:, consts.TIME_COLUMN],
+                'animals': evs[:, consts.RFID_ID_COLUMN],
+                'board': board,
+            })
+    return sorted(maes, key=lambda i: i['times'][0])
+
+
+def generate_chase_matrix(multi_animal_events, board=None, animals=None):
+    if board is None:
+        tb = lambda b: True
+    else:
+        tb = lambda b: board == b
+    chase_dict = {}
+    for e in multi_animal_events:
+        if not tb(e['board']):
+            continue
+        chaser = e['animals'][0]
+        chased = e['animals'][1:]
+        if chaser not in chase_dict:
+            chase_dict[chaser] = {}
+        for c in chased:
+            if c not in chase_dict[chaser]:
+                chase_dict[chaser][c] = 1
+            else:
+                chase_dict[chaser][c] += 1
+    if animals is None:
+        animals = chase_dict.keys()
+        [animals.extend(chase_dict[a].keys()) for a in chase_dict]
+        animals = sorted(list(set(animals)))
+    n = len(animals)
+    chase_matrix = numpy.zeros((n, n))
+    for (i, a) in enumerate(animals):
+        for (j, b) in enumerate(animals):
+            chase_matrix[i, j] = chase_dict.get(a, {}).get(b, 0)
+    return chase_matrix, animals

@@ -375,3 +375,16 @@ def plot_merged_sequence(
         if 'where' not in kwargs:
             kwargs['where'] = 'post'
     plot_func(xs, ys + offset, **kwargs)
+
+
+def plot_chase_matrix(chase_matrix, animals):
+    pylab.imshow(chase_matrix, interpolation='nearest')
+    pylab.ylabel('chaser')
+    pylab.xlabel('chased')
+    n = len(animals)
+    pylab.xticks(numpy.arange(n), ['%s' % hex(a) for a in animals])
+    pylab.yticks(numpy.arange(n), ['%s' % hex(a) for a in animals])
+    for y in xrange(n):
+        for x in xrange(n):
+            pylab.text(
+                x, y, '%s' % chase_matrix[y, x], ha='center', va='center')
