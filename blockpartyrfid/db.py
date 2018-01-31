@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 
 import os
+import sys
 
 import numpy
 
 from . import consts
 from . import io
+
+
+if sys.version_info.major > 2:
+    unicode = str
+
 
 
 def sel(vs, board=None, event=None, data0=None, data1=None, timerange=None):
@@ -44,7 +50,7 @@ def _reduce_dict(d):
     if isinstance(d, (list, tuple, numpy.ndarray)):
         return d
     if isinstance(d, dict):
-        if len(d.keys()) == 1 and d.keys()[0] is None:
+        if len(d.keys()) == 1 and list(d.keys())[0] is None:
             return _reduce_dict(d[None])
         else:
             return {k: _reduce_dict(d[k]) for k in d}

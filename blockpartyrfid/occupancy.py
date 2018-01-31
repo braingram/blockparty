@@ -631,7 +631,7 @@ def from_tube_sequence(rfid_reads):
 def merge_sequences(sequences):
     od = {}
     hits = 0
-    for si in xrange(len(sequences)):
+    for si in range(len(sequences)):
         s = sequences[si]
         if si != len(sequences) - 1:
             n = sequences[si + 1]

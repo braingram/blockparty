@@ -31,12 +31,12 @@ ad = blockpartyrfid.db.split_events(
 
 # get all animal ids
 print("Founds animals:")
-for a in ad.keys()[:]:
+for a in list(ad.keys())[:]:
     if len(ad[a]) < min_rfid_reads:
         del ad[a]
         continue
     print("  %s: %s" % (hex(a), len(ad[a])))
-animals = ad.keys()
+animals = list(ad.keys())
 
 # as a rfid tag in front of the reader will result in multiple reads
 # determine rfid tag read merge threshold

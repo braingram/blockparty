@@ -33,6 +33,7 @@ def get_log_files(log_directory):
 
 
 def dc(v):
+    v = v.decode('utf-8')
     if v in 'LR':
         return 'LR'.index(v)
     if v in 'ub':
