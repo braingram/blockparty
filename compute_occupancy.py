@@ -11,7 +11,7 @@ import blockpartyrfid
 dname = '171219_140801'
 rfid_merge_threshold = None
 output_filename = 'occupancy.csv'
-min_rfid_reads = 10
+min_rfid_reads = 100
 
 if len(sys.argv) > 1:
     dname = sys.argv[1]

@@ -156,7 +156,6 @@ def plot_time_in_cage(
     # TODO set figure size
     if cm is None:
         cm = default_cm
-    spb = 101 + len(aids) * 10
     colors = [cm(bid / float(n_cages - 1)) for bid in range(n_cages)]
     colors.append((0., 0., 0., 0.0))  # add white for unknown
     for (i, aid) in enumerate(aids):
@@ -166,7 +165,7 @@ def plot_time_in_cage(
             cts.append(db.sum_range(ao[ao[:, 2] == ci, :2]))
         # add un-accounted for time
         cts.append(full_time - sum(cts))
-        pylab.subplot(spb + i)
+        pylab.subplot(1, len(aids), i + 1)
         pylab.pie(
             cts, labels=blabels, autopct='%1.1f%%', colors=colors)
         if as_hex:
