@@ -383,7 +383,7 @@ def plot_chase_matrix(chase_matrix, animals):
     n = len(animals)
     pylab.xticks(numpy.arange(n), ['%s' % hex(a) for a in animals])
     pylab.yticks(numpy.arange(n), ['%s' % hex(a) for a in animals])
-    for y in xrange(n):
-        for x in xrange(n):
+    for y in range(n):
+        for x in range(n):
             pylab.text(
                 x, y, '%s' % chase_matrix[y, x], ha='center', va='center')

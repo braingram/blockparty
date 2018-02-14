@@ -731,8 +731,8 @@ def generate_chase_matrix(multi_animal_events, board=None, animals=None):
             else:
                 chase_dict[chaser][c] += 1
     if animals is None:
-        animals = chase_dict.keys()
-        [animals.extend(chase_dict[a].keys()) for a in chase_dict]
+        animals = list(chase_dict.keys())
+        [animals.extend(list(chase_dict[a].keys())) for a in chase_dict]
         animals = sorted(list(set(animals)))
     n = len(animals)
     chase_matrix = numpy.zeros((n, n))
