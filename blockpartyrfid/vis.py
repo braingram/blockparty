@@ -2,6 +2,7 @@
 
 import sys
 
+import matplotlib.patches
 import numpy
 import pylab
 
@@ -381,9 +382,55 @@ def plot_chase_matrix(chase_matrix, animals):
     pylab.ylabel('chaser')
     pylab.xlabel('chased')
     n = len(animals)
-    pylab.xticks(numpy.arange(n), ['%s' % hex(a) for a in animals])
+    pylab.xticks(numpy.arange(n), ['%s' % hex(a) for a in animals], rotation=45)
     pylab.yticks(numpy.arange(n), ['%s' % hex(a) for a in animals])
     for y in range(n):
         for x in range(n):
             pylab.text(
                 x, y, '%s' % chase_matrix[y, x], ha='center', va='center')
+    pylab.subplots_adjust(bottom=0.19)
+
+
+def plot_occupancy3(
+        occupancy, offset=0.0, animals=None,
+        cm=None, n_cages=None, n_animals=None,
+        label_left=None):
+    if cm is None:
+        cm = default_cm
+    # [enter, exit, cage, animal]
+
+    # give each animal a color
+    if animals is None:
+        aids = sorted(numpy.unique(occupancy[:, 3]))
+    else:
+        aids = animals
+    if n_animals is None:
+        n_aids = len(aids)
+    else:
+        n_aids = n_animals
+    dy = 1. / n_aids
+    ainfo = {
+        aid: (cm(i / (n_aids - 1.)), i * dy) for (i, aid)
+        in enumerate(aids)}
+
+    # find # of cages
+    if n_cages is None:
+        n_cages = len(numpy.unique(occupancy[:, 2]))
+
+    bar_height = 1. / n_aids
+    patches = []
+    dy = 1. / n_aids
+    xmin, xmax = occupancy[0][:2]
+    ax = pylab.gca()
+    for o in occupancy:
+        (t0, t1, cage, animal) = o[:4]
+        c, ady = ainfo[animal]
+        p = matplotlib.patches.Rectangle(
+            (t0, cage + ady), t1 - t0, dy, color=c)
+        patches.append(p)
+        ax.add_patch(p)
+        xmin = min(xmin, t0)
+        xmax = max(xmax, t1)
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(0, n_cages)
+    return patches

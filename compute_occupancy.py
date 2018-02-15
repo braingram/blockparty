@@ -8,7 +8,7 @@ import pylab
 import blockpartyrfid
 
 
-dname = '171219_140801'
+dname = '180131'
 rfid_merge_threshold = None
 output_filename = 'occupancy.csv'
 min_rfid_reads = 100
@@ -76,6 +76,9 @@ for a in animals:
 # merge occupancies from all animals
 o = blockpartyrfid.occupancy.merge_occupancies(occupancy.values())
 
+maes = blockpartyrfid.occupancy.find_multi_animal_events(rfid_reads, rfid_merge_threshold)
+cm, cm_animals = blockpartyrfid.occupancy.generate_chase_matrix(maes)
+
 # save occupancy as csv
 print("Saving to %s" % output_filename)
 numpy.savetxt(output_filename, o, delimiter=',')
@@ -84,5 +87,7 @@ numpy.savetxt(output_filename, o, delimiter=',')
 pylab.figure()
 blockpartyrfid.vis.plot_time_in_cage(o)
 pylab.figure()
-blockpartyrfid.vis.plot_occupancy(o)
+blockpartyrfid.vis.plot_occupancy(o[-1000:])
+pylab.figure()
+blockpartyrfid.vis.plot_chase_matrix(cm, cm_animals)
 pylab.show()
