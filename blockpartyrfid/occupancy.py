@@ -687,7 +687,7 @@ def find_multi_animal_events(rfid_reads, threshold):
         br = reads[reads[:, consts.BOARD_COLUMN] == board]
         starts = numpy.where(
             numpy.diff(br[:, consts.TIME_COLUMN]) < threshold)[0]
-        n = len(reads)
+        n = len(br)
         used = []
         for start in starts:
             if start in used:

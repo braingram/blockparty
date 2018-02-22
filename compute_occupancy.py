@@ -7,6 +7,12 @@ import pylab
 
 import blockpartyrfid
 
+females = [
+    0x2a006d2c35,
+    0x2a006d2e25,
+    0x2a006d3160,
+    0x2a006d5ca5,
+]
 
 dname = '180131'
 rfid_merge_threshold = None
@@ -37,6 +43,7 @@ for a in list(ad.keys())[:]:
         continue
     print("  %s: %s" % (hex(a), len(ad[a])))
 animals = list(ad.keys())
+animals = sorted(animals, key=lambda i: 1 - int(i in females))
 
 # as a rfid tag in front of the reader will result in multiple reads
 # determine rfid tag read merge threshold
@@ -77,7 +84,7 @@ for a in animals:
 o = blockpartyrfid.occupancy.merge_occupancies(occupancy.values())
 
 maes = blockpartyrfid.occupancy.find_multi_animal_events(rfid_reads, rfid_merge_threshold)
-cm, cm_animals = blockpartyrfid.occupancy.generate_chase_matrix(maes)
+cm, cm_animals = blockpartyrfid.occupancy.generate_chase_matrix(maes, animals=animals)
 
 # save occupancy as csv
 print("Saving to %s" % output_filename)
