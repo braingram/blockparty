@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import networkx
-import numpy
 
 
 def generate_association_graph(maes, show=True):
@@ -16,13 +15,13 @@ def generate_association_graph(maes, show=True):
                 if o not in associations[a]:
                     associations[a][o] = 0
                 associations[a][o] += 1
-    
+
     animals = list(associations.keys())
     g = networkx.DiGraph()
     for a in animals:
         for o in associations[a]:
             g.add_edge(hex(a), hex(o), weight=associations[a][o])
-    
+
     if show:
         networkx.draw_circular(
             g, width=[d['weight'] / 50 for (u, v, d) in g.edges(data=True)],
