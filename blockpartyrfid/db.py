@@ -120,5 +120,5 @@ def merge_close_reads(reads, threshold=1000):
     # keep cross board reads
     m = numpy.ones(len(reads), dtype='bool')
     m[1:] = numpy.diff(reads[:, 0]) > threshold
-    m[1:] |= numpy.diff(reads[:, 1] != 0)
+    m[1:] |= numpy.diff(reads[:, 1]) != 0
     return reads[m]

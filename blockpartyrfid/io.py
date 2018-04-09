@@ -14,6 +14,8 @@ def get_log_files(log_directory):
     for fn in os.listdir(log_directory):
         if '.csv' not in fn:
             continue
+        if '_' not in fn:
+            continue
         fn = os.path.join(log_directory, fn)
         if '_touch' not in fn:
             fns.append(fn)
