@@ -68,7 +68,7 @@ rfid_df['name'] = rfid_df['data0'].replace(
     {i.rfid: i.name for i in animals.itertuples()})
 
 # TODO merge close rfid reads    
-def find_shorted_board_to_board_time(df):
+def find_shortest_board_to_board_time(df):
     t = numpy.array(df['time'])
     b = numpy.array(df['board'])
     m = b[1:] != b[:-1]
@@ -77,9 +77,10 @@ def find_shorted_board_to_board_time(df):
 
 grouped_rfid_df = rfid_df.groupby('data0')
 rfid_merge_threshold = grouped_rfid_df.apply(
-    find_shorted_board_to_board_time).min()
+    find_shortest_board_to_board_time).min()
 
 ad = {}
+animal_occupancies = {}
 for aid in grouped_rfid_df.groups:
     df = grouped_rfid_df.get_group(aid)
     # keep all events where dt > thresh or board changed
@@ -92,14 +93,67 @@ for aid in grouped_rfid_df.groups:
     ad[aid] = df[m]
     
     # TODO convert from reads to sequence to occupancy
-    b = numpy.array(ad[aid]['board'])
+    df = ad[aid]
+    t = numpy.array(df['time'])
+    b = numpy.array(df['board'])
     
     # find all 'starts' (where board at t0 is 1 off from board at t1)
-    # for each start, trace out until next start (or error)
-    # if the next start agrees, accept, if not, reject
+    starts = numpy.where(numpy.abs(numpy.diff(b)) == 1)[0]
+    starts_cage = numpy.vstack((b[starts], b[starts + 1])).max(axis=0)
+    # find all 'misses' where board changes by >1
+    misses = numpy.where(numpy.abs(numpy.diff(b)) > 1)[0]
+    
+    occupancy = []
+    successes = []
+    failures = []
+    n = len(b)
+    ns = 0
+    # for each start index
+    for (si, s) in enumerate(starts[:-1]):
+        # this is only accepting forward sequences (which are verified)
+        # this is not accepting backward sequences when the forward is verified
+        seq = []
+        # determine cage from board sequence
+        cage = starts_cage[si]
+        # at df[s]['time'] animal entered cage
+        i = s + 1
+        while i < n:
+            # trace out until next start (or error)
+            if i in misses:
+                # lost sequence, stop here, reject
+                failures.append((s, i, 1))
+                break
+            # if the next start agrees, accept, if not, reject
+            #if (starts[i] not in (cage, cage - 1)
+            seq.append([t[i-1], t[i], cage])
+            if b[i] == cage:
+                # moved up 1 cage
+                cage += 1
+            elif b[i] == cage - 1:
+                # moved down 1 cage
+                cage -= 1
+            else:  # error!
+                failures.append((s, i, 2))
+                break
+            if i == starts[si + 1]:
+                if cage == starts_cage[si + 1]:
+                    ns += 1
+                    successes.append((s, i, 0))
+                    # build occupancy from
+                    # df[s] entered start_cage
+                    # df[i] left current cage
+                    occupancy.extend(seq)
+                else:
+                    failures.append((s, i, 3))
+                break
+            i += 1
     # compute reliability score (accepts vs rejects)
     # output occupancy (start time, end time, cage, animal[name], ?)
-    # what about unknown period? fill in possible cages?
+    animal_occupancies[aid] = {
+        'sequence': occupancy,
+        'reliability': ns / float(len(starts)),
+    }
+    # TODO what about unknown period? fill in possible cages?
 
 # TODO find multi-animal events
 # TODO generate chase matrix

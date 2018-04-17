@@ -26,7 +26,7 @@ if len(sys.argv) > 2:
     rfid_merge_threshold = int(rfid_merge_threshold)
 
 # load in all data
-d = blockpartyrfid.io.load_log_directory(dname)
+d = blockpartyrfid.io.load_log_directory(dname, convert_times=False)
 
 # filter to just valid rfid tag events
 rd = blockpartyrfid.db.sel(d, event='rfid', data1=0)
