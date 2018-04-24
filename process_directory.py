@@ -7,6 +7,7 @@ import time
 
 import numpy
 import pandas
+import scipy.ndimage
 
 
 dname = '180131'
@@ -52,7 +53,8 @@ else:
         'rfid': tags,
         'name': tags,
     })
-
+# ensure all tags are upper case
+animals['rfid'] = [s.upper() for s in animals['rfid']]
 
 # add datetime column, TODO do this after merging etc...
 fets = numpy.array(fets)
@@ -79,7 +81,7 @@ grouped_rfid_df = rfid_df.groupby('data0')
 rfid_merge_threshold = grouped_rfid_df.apply(
     find_shortest_board_to_board_time).min()
 
-ad = {}
+animal_data = {}
 animal_occupancies = {}
 for aid in grouped_rfid_df.groups:
     df = grouped_rfid_df.get_group(aid)
@@ -90,10 +92,10 @@ for aid in grouped_rfid_df.groups:
     m[1:] = (t[1:] - t[:-1]) > rfid_merge_threshold
     m[1:] |= b[1:] != b[:-1]
     
-    ad[aid] = df[m]
+    animal_data[aid] = df[m]
     
     # TODO convert from reads to sequence to occupancy
-    df = ad[aid]
+    df = animal_data[aid]
     t = numpy.array(df['time'])
     b = numpy.array(df['board'])
     
@@ -155,10 +157,40 @@ for aid in grouped_rfid_df.groups:
     }
     # TODO what about unknown period? fill in possible cages?
 
-# TODO find multi-animal events
-# TODO generate chase matrix
+# find multi-animal events
+# generate rfid_reads dataframe
+filtered_rfid_df = pandas.concat(animal_data.values()).sort_values('time')
+# re-group animal events by board
+by_board_rfid_df = filtered_rfid_df.groupby('board')
+by_board_groups = {
+    g: by_board_rfid_df.get_group(g) for g in by_board_rfid_df.groups}
+
+# use rfid merge threshold as multi-animal event threshold
+mae_threshold = rfid_merge_threshold
+maes = []
+for b in by_board_groups:
+    df = by_board_groups[b]
+    dt = numpy.diff(numpy.array(df['time']))
+    ls, nl = scipy.ndimage.label(dt < mae_threshold)
+    for l in xrange(1, nl + 1):
+        inds = numpy.where(ls == l)[0]
+        s = inds.min()
+        e = inds.max() + 2
+        maes.append(df.iloc[s:e])
+
+# generate chase matrix
+names = list(animals['name'])
+n_animals = len(names)
+chase_matrix = numpy.zeros((n_animals, n_animals), dtype='int')
+for mae in maes:
+    chaser = mae.iloc[-1]['name']
+    chaser_index = names.index(chaser)
+    for chased in mae.iloc[:-1]['name']:
+        chased_index = names.index(chased)
+        chase_matrix[chaser_index, chased_index] += 1
+
 # TODO save, plot, print
-    
+
 # print out some info
 print()
 print("=========== Session info ============")
