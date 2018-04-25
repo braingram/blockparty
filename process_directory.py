@@ -199,7 +199,7 @@ for b in by_board_groups:
     df = by_board_groups[b]
     dt = numpy.diff(numpy.array(df['time']))
     ls, nl = scipy.ndimage.label(dt < mae_threshold)
-    for l in xrange(1, nl + 1):
+    for l in range(1, nl + 1):
         inds = numpy.where(ls == l)[0]
         s = inds.min()
         e = inds.max() + 2
