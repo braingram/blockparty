@@ -3,6 +3,7 @@
 import datetime
 import glob
 import os
+import pickle
 import time
 
 import numpy
@@ -56,7 +57,7 @@ else:
 # ensure all tags are upper case
 animals['rfid'] = [s.upper() for s in animals['rfid']]
 
-# add datetime column, TODO do this after merging etc...
+# add datetime column, maybe do this after merging etc...
 fets = numpy.array(fets)
 slope, intercept = numpy.polyfit(fets[:, 1], fets[:, 0], 1)
 rfid_df['datetime'] = pandas.to_datetime(
@@ -65,9 +66,9 @@ rfid_df['datetime'] = pandas.to_datetime(
         ) * 1000).astype('int64'),
     unit='ms')
 
-# add name column, TODO do this after merging etc...
-rfid_df['name'] = rfid_df['data0'].replace(
-    {i.rfid: i.name for i in animals.itertuples()})
+# add name column, maybe do this after merging etc...
+aid_to_name_map = {i.rfid: i.name for i in animals.itertuples()}
+rfid_df['name'] = rfid_df['data0'].replace(aid_to_name_map)
 
 # TODO merge close rfid reads    
 def find_shortest_board_to_board_time(df):
@@ -157,9 +158,35 @@ for aid in grouped_rfid_df.groups:
     }
     # TODO what about unknown period? fill in possible cages?
 
+# merge animal occupancies: start_datetime, end_datetime, cage, animal_id, animal_name
+occupancy = None
+for aid in animal_occupancies:
+    df = pandas.DataFrame(
+        animal_occupancies[aid]['sequence'],
+        columns=['start_time', 'end_time', 'cage'])
+    df['rfid'] = aid
+    df['name'] = aid_to_name_map[aid]
+    if occupancy is None:
+        occupancy = df
+    else:
+        occupancy = pandas.concat((occupancy, df), ignore_index=True)
+occupancy = occupancy.sort_values('start_time').reset_index(drop=True)
+# add start_date, end_date
+occupancy['start_date'] = pandas.to_datetime(
+    ((
+        numpy.array(occupancy['start_time'], dtype='f8') * slope + intercept
+        ) * 1000).astype('int64'),
+    unit='ms')
+occupancy['end_date'] = pandas.to_datetime(
+    ((
+        numpy.array(occupancy['end_time'], dtype='f8') * slope + intercept
+        ) * 1000).astype('int64'),
+    unit='ms')
+
 # find multi-animal events
 # generate rfid_reads dataframe
 filtered_rfid_df = pandas.concat(animal_data.values()).sort_values('time')
+
 # re-group animal events by board
 by_board_rfid_df = filtered_rfid_df.groupby('board')
 by_board_groups = {
@@ -188,8 +215,16 @@ for mae in maes:
     for chased in mae.iloc[:-1]['name']:
         chased_index = names.index(chased)
         chase_matrix[chaser_index, chased_index] += 1
+chase_matrix = pandas.DataFrame(chase_matrix, index=names, columns=names)
+        
+# save results
+filtered_rfid_df.to_csv('filtered_rfid.csv')
+occupancy.to_csv('occupancy.csv')
+chase_matrix.to_csv('chase_matrix.csv')
+with open('multi_animal_events.p', 'wb') as f:
+    pickle.dump(maes, f)
 
-# TODO save, plot, print
+# TODO plot
 
 # print out some info
 print()
@@ -198,5 +233,13 @@ print("Duration of experiment: %s" % rfid_df['datetime'].ptp())
 print()
 ec = rfid_df['data1'].value_counts()
 print("RFID read errors: %s" % (ec.get('1', '0')))
-print("Raw animal tags and reads:")
-print(rfid_df['name'].value_counts())
+#print("Raw animal tags and reads:")
+#print(rfid_df['name'].value_counts())
+print("Filtered animal tags and reads:")
+print(filtered_rfid_df['name'].value_counts())
+print("")
+print("Multi-animal events: %s" % len(maes))
+print("Number of doubles, triples, etc...")
+cs = pandas.Series([len(i) for i in maes])
+print(cs.value_counts())
+print("")
