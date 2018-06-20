@@ -4,14 +4,15 @@
 EVENT_RFID = 0
 EVENT_BEAM = 1
 EVENT_TOUCH_RAW = 2
-EVENT_TOUCH_BINARY = 3
+EVENT_SYNC = 3
+EVENT_ANALOG_PD = 4
 
 event_strings = {
     'rfid': EVENT_RFID,
     'beam': EVENT_BEAM,
     'touch_raw': EVENT_TOUCH_RAW,
-    'touch_binary': EVENT_TOUCH_BINARY,
-    'touch': EVENT_TOUCH_BINARY,
+    'sync': EVENT_SYNC,
+    'analog_pd': EVENT_ANALOG_PD,
 }
 
 # columns
@@ -68,24 +69,24 @@ data_strings = {
             'u': BEAM_UNBROKEN,
         },
     },
-    EVENT_TOUCH_BINARY: {
-        0: {
-            'l': TOUCH_LEFT,
-            'r': TOUCH_RIGHT,
-        },
-        1: {
-            't': TOUCH_TOUCHED,
-            'u': TOUCH_UNTOUCHED,
-        },
-    },
+    #EVENT_TOUCH_BINARY: {
+    #    0: {
+    #        'l': TOUCH_LEFT,
+    #        'r': TOUCH_RIGHT,
+    #    },
+    #    1: {
+    #        't': TOUCH_TOUCHED,
+    #        'u': TOUCH_UNTOUCHED,
+    #    },
+    #},
 }
 
 sides = {
     EVENT_BEAM: [BEAM_LEFT, BEAM_RIGHT],
-    EVENT_TOUCH_BINARY: [TOUCH_LEFT, TOUCH_RIGHT],
+    #EVENT_TOUCH_BINARY: [TOUCH_LEFT, TOUCH_RIGHT],
 }
 
 states = {
     EVENT_BEAM: [BEAM_BROKEN, BEAM_UNBROKEN],
-    EVENT_TOUCH_BINARY: [TOUCH_TOUCHED, TOUCH_UNTOUCHED],
+    #EVENT_TOUCH_BINARY: [TOUCH_TOUCHED, TOUCH_UNTOUCHED],
 }

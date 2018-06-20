@@ -4,6 +4,7 @@ import datetime
 import glob
 import os
 import pickle
+import sys
 import time
 
 import numpy
@@ -12,6 +13,8 @@ import scipy.ndimage
 
 
 dname = '180131'
+if len(sys.argv) > 1:
+    dname = sys.argv[1]
 
 print("Processing directory: %s" % dname)
 # get all data filenames (don't include touch data)

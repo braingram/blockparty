@@ -8,7 +8,7 @@ from . import db
 
 event_weights = {
     consts.EVENT_BEAM: 2,
-    consts.EVENT_TOUCH_BINARY: 1,
+    #consts.EVENT_TOUCH_BINARY: 1,
 }
 
 state_weights = {
@@ -16,10 +16,10 @@ state_weights = {
         consts.BEAM_BROKEN: 2,
         consts.BEAM_UNBROKEN: 1,
     },
-    consts.EVENT_TOUCH_BINARY: {
-        consts.TOUCH_TOUCHED: 2,
-        consts.TOUCH_UNTOUCHED: 1,
-    }
+    #consts.EVENT_TOUCH_BINARY: {
+    #    consts.TOUCH_TOUCHED: 2,
+    #    consts.TOUCH_UNTOUCHED: 1,
+    #}
 }
 
 

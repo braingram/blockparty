@@ -31,7 +31,9 @@ def dc(v):
         return 'ub'.index(v)
     if v in 'fr':
         return 'fr'.index(v)
+    return int('0x' + v, 16)
     try:
+    
         return int(v)
     except:
         return int('0x' + v, 16)

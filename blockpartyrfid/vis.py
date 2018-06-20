@@ -119,7 +119,7 @@ def plot_events(
         animals = db.all_animals(events)
     if event_types is None:
         #event_types = ['rfid', 'beam', 'touch_binary', 'touch_raw']
-        event_types = ['rfid', 'beam', 'touch_binary']
+        event_types = ['rfid', 'beam']
     if not isinstance(event_types, (list, tuple)):
         event_types = [event_types, ]
     # TODO determine offsets
