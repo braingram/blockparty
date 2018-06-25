@@ -8,3 +8,11 @@ class Event(object):
         self.etype = etype
         self.data0 = data0
         self.data1 = data1
+    
+    def __repr__(self):
+        return (
+            "%s<t: %i, B:%i, T:%i, D0:%s, D1:%s>" % (
+                self.__class__.__name__,
+                self.timestamp,
+                self.board, self.etype,
+                self.data0, self.data1))
