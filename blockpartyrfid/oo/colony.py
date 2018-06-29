@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
+import copy
 import datetime
 import glob
 import os
 import time
+
+import numpy
 
 from .animal import Animal, debug_animal
 from .cage import Cage
@@ -31,10 +34,11 @@ class Colony(object):
     
     def process_event(self, event):
         # event [time, board, type, d0, d1]
-        if event.etype == consts.EVENT_SYNC:
-            self.clock.sync(
-                event.timestamp, getattr(event, 'worldtimestamp', None))
+        #if event.etype == consts.EVENT_SYNC:
+        #    self.clock.sync(
+        #        event.timestamp, getattr(event, 'worldtimestamp', None))
         event.world_timestamp = self.clock.teensy_to_world(event.timestamp)
+        #event.world_timestamp = event.timestamp
         # if rfid read, pass to animal
         if event.etype == consts.EVENT_RFID:
             rfid = event.data0
@@ -53,6 +57,11 @@ class Colony(object):
                 animal.last_read = event
                 if (event.board != last_read.board):
                     # animal seen in different board/tube
+                    # track animal reads
+                    animal.was_read(event.board, event.world_timestamp)
+                    self.tubes[event.board].read_animal(
+                            rfid, event.world_timestamp)
+                    # track tube reads
                     if (
                             (event.board == last_read.board + 1) or
                             (self.ring and (
@@ -68,6 +77,9 @@ class Colony(object):
                         # check against previous predictions, if matches
                         # accept all previous predictions
                         animal.set_occupancy(cage, last_read, event)
+                        #animal.was_read(event.board, event.world_timestamp)
+                        #self.tubes[event.board].read_animal(
+                        #    rfid, event.world_timestamp)
                         
                         # predicting that animal is now in cage to the right
                         # of event.board
@@ -92,6 +104,9 @@ class Colony(object):
                         # check against previous predictions, if matches
                         # accept all previous predictions
                         animal.set_occupancy(cage, last_read, event)
+                        #animal.was_read(event.board, event.world_timestamp)
+                        #self.tubes[event.board].read_animal(
+                        #    rfid, event.world_timestamp)
                         
                         # predicting that animal is now in cage to the right
                         # of event.board
@@ -102,6 +117,13 @@ class Colony(object):
                             print("teleported")
                         # animal teleported!
                         # TODO count misses
+                        #animal.was_read(event.board, event.world_timestamp)
+                        animal.teleported(
+                            event.world_timestamp,
+                            last_read.board, event.board)
+                        #self.tubes[event.board].read_animal(
+                        #    rfid, event.world_timestamp)
+                        
                         # TODO fill in gap?
                         
                         # reject all previous predictions, reset animal position
@@ -117,6 +139,10 @@ class Colony(object):
                         > self.rfid_merge_threshold):
                     # animal read in same tube, but these are separate reads
                     # events > merge threshold apart
+                    # track animal reads
+                    animal.was_read(event.board, event.world_timestamp)
+                    self.tubes[event.board].read_animal(
+                            rfid, event.world_timestamp)
                     
                     # predicting that the animal moved out of the adjacent
                     # cage, through this tube to the connected cage
@@ -132,13 +158,25 @@ class Colony(object):
                         if cage == lc:
                             # predict animal moved right
                             animal.set_prediction(rc, event)
+                            #animal.was_read(event.board, event.world_timestamp)
+                            #self.tubes[event.board].read_animal(
+                            #    rfid, event.world_timestamp)
                         elif cage == rc:
                             # predict animal moved left
                             animal.set_prediction(lc, event)
+                            #animal.was_read(event.board, event.world_timestamp)
+                            #self.tubes[event.board].read_animal(
+                            #    rfid, event.world_timestamp)
                         else:
                             # TODO count misses
                             # TODO fill in gap
                             animal.clear_predictions(event)
+                            #animal.was_read(event.board, event.world_timestamp)
+                            animal.teleported(
+                                event.world_timestamp,
+                                last_read.board, event.board)
+                            #self.tubes[event.board].read_animal(
+                            #    rfid, event.world_timestamp)
                 else:
                     if event.data0 == debug_animal:
                         print("skipping(merging)")
@@ -161,19 +199,35 @@ class Colony(object):
         return evs
  
     def process_directory(
-            self, directory, pre_measure_rfid_merge_threshold=True):
+            self, directory, pre_measure_rfid_merge_threshold=True,
+            pre_sync_clocks=True, multi_animal_event_threshold=None):
         fns = glob.glob(os.path.join(directory, '*.csv'))
         # read all events
         evs = {}
         for fn in fns:
             evs[fn] = self.read_events(fn)
-        if pre_measure_rfid_merge_threshold:
+        if pre_measure_rfid_merge_threshold or pre_sync_clocks:
             # find min board-to-board time
             ats = {}
             mdt = None
+            sts = []
             for fn in fns:
+                # parse timestamp from filename
+                dts = os.path.splitext(os.path.basename(fn))[0]
+                dt = datetime.datetime.strptime(dts, '%y%m%d_%H%M%S')
+                # convert to ms
+                start_time = time.mktime(dt.timetuple()) * 1000.
+                synced = False
                 for e in evs[fn]:
-                    if e.etype == consts.EVENT_RFID:
+                    if e.etype == consts.EVENT_SYNC:
+                        if synced:
+                            raise Exception(
+                                "Found >1 time sync in file: %s" % (fn, ))
+                        # handle possible rollover
+                        t = self.clock.teensy_to_world(e.timestamp)
+                        sts.append([t, start_time])
+                        synced = True
+                    elif e.etype == consts.EVENT_RFID:
                         aid = e.data0
                         if aid in ats and (ats[aid].board != e.board):
                             dt = e.timestamp - ats[aid].timestamp
@@ -185,17 +239,66 @@ class Colony(object):
                             else:
                                 mdt = min(dt, mdt)
                         ats[aid] = e
-            self.rfid_merge_threshold = mdt
+            if pre_measure_rfid_merge_threshold:
+                self.rfid_merge_threshold = mdt
+                if multi_animal_event_threshold is None:
+                    multi_animal_event_threshold = mdt
+            if pre_sync_clocks:
+                self.clock.sync(sts)
+            self.clock.reset_rollover()
+        
+        for t in self.tubes:
+            t.multi_animal_event_threshold = (
+                multi_animal_event_threshold)
         for fn in fns:
+            """
             # parse timestamp from filename
             dts = os.path.splitext(os.path.basename(fn))[0]
             dt = datetime.datetime.strptime(dts, '%y%m%d_%H%M%S')
             start_time = time.mktime(dt.timetuple())
             synced = False
+            """
             for e in evs[fn]:
+                """
                 if e.etype == consts.EVENT_SYNC:
                     if synced:
                         raise Exception(">1 time sync in this file")
                     e.world_timestamp = start_time
                     synced = True
+                """
                 self.process_event(e)
+
+    def get_occupancy(self, animals=None, old_format=True):
+        if animals is None:
+            animals = list(self.animals.keys())
+        o = []
+        for a in animals:
+            o.extend(copy.copy(self.animals[a].occupancy))
+            #ai = int(a, 16)
+            #for i in self.animals[a].occupancy:
+            #    o.append(i + [ai, ])
+        o.sort(key=lambda i: i[1].world_timestamp)
+        if not old_format:
+            return o
+        oo = []
+        for i in o:
+            # [st, et, cage, animal, 0]
+            oo.append([
+                i[1].world_timestamp, i[2].world_timestamp, i[0],
+                int(i[1].data0, 16), 0])
+        oo = numpy.array(oo)
+        #oo[:, 0] *= 1000.
+        #oo[:, 1] *= 1000.
+        return oo.astype('i8')
+    
+    def get_chase_matrix(self, animals=None):
+        if animals is None:
+            animals = sorted(list(self.animals.keys()))
+        n = len(animals)
+        maes = numpy.zeros((n, n))
+        ti = lambda aid: animals.index(aid)
+        for t in self.tubes:
+            for mae in t.multi_animal_events:
+                chaser, chasee, _ = mae
+                maes[ti(chaser), ti(chasee)] += 1
+        return maes, animals

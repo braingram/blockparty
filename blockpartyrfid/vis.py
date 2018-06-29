@@ -148,11 +148,11 @@ def plot_time_in_cage(
     else:
         aids = animals
     if n_cages is None:
-        n_cages = numpy.max(occupancy[:, 2]) + 1
+        n_cages = int(numpy.max(occupancy[:, 2]) + 1)
 
     if full_time is None:
-        full_time = occupancy[-1, 1] - occupancy[0, 0]
-    blabels = [str(cid) for cid in range(n_cages)]
+        full_time = occupancy[:, 1].max() - occupancy[:, 0].min()
+    blabels = [str(cid) for cid in range(int(n_cages))]
     blabels.append('?')
     # TODO set figure size
     if cm is None:
@@ -163,7 +163,7 @@ def plot_time_in_cage(
         ao = occupancy[occupancy[:, 3] == aid]
         cts = []
         for ci in range(n_cages):
-            cts.append(db.sum_range(ao[ao[:, 2] == ci, :2]))
+            cts.append(db.sum_range(ao[ao[:, 2] == ci, :2].astype('f8')))
         # add un-accounted for time
         cts.append(full_time - sum(cts))
         pylab.subplot(1, len(aids), i + 1)

@@ -103,6 +103,9 @@ def sum_range(a):
     if len(a) == 0:
         return s
     for i in range(len(a) - 1):
+        if a[i, 1] < a[i, 0]:
+            raise Exception(
+                "Invalid range, end time is before start[%i]: %s" % (i, a[i]))
         if a[i, 1] > a[i + 1, 0]:
             s += a[i + 1, 0] - a[i, 0]
         else:

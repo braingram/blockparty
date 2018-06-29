@@ -3,7 +3,8 @@
 
 #debug_animal = '2A006D2D1B'
 #debug_animal = '2A006D4F9F'
-debug_animal = '2A006D5AF7'
+#debug_animal = '2A006D5AF7'
+debug_animal = None
 
 
 class Animal(object):
@@ -21,6 +22,21 @@ class Animal(object):
         
         self.predictions = []
         self.occupancy = []
+        
+        self.reads_per_tube = {}
+        self.teleports = []
+    
+    def was_read(self, tube, timestamp):
+        if tube not in self.reads_per_tube:
+            self.reads_per_tube[tube] = 1
+        else:
+            self.reads_per_tube[tube] += 1
+    
+    def get_n_reads(self):
+        return sum(self.reads_per_tube.values())
+    
+    def teleported(self, time, old_tube, new_tube):
+        self.teleports.append([time, old_tube, new_tube])
 
     def set_occupancy(self, cage, last_event, event):
         if self.rfid == debug_animal:
