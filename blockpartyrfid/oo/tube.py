@@ -2,8 +2,6 @@
 
 
 class Tube(object):
-    
-    
     def __init__(self, number):
         self.number = number
         self.multi_animal_events = []

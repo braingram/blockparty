@@ -40,11 +40,14 @@ def filter_bbs(bbs):
         else:
             # check if rising edge is further than duration
             bbd = f - r
+            # compute duration of previous beam break and clip to range = d
             d = min(max(200, (b[1] - b[0])), 1000)
+            # if rising edge of this beam bream is > d away and it's duration
+            # is > some min duration, accept as new beam break
             if r > (b[1] + d) and bbd > 50:
                 bs.append(b)
                 b = (r, f)
-            else:  # eat next beam break
+            else:  # else eat next beam break
                 b = (b[0], f)
     bs.append(b)
     return numpy.array(bs)
@@ -85,7 +88,8 @@ for i in range(len(rbbs)):
     pairs['right'].append([ii, li, i])
 
 
-complete = []    
+# if the closest pairs match using lbb,rbb,and r as ref, accept as complete
+complete = []
 missing = []
 for k in pairs:
     for i in pairs[k]:

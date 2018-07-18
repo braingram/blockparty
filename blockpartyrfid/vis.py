@@ -382,8 +382,12 @@ def plot_chase_matrix(chase_matrix, animals):
     pylab.ylabel('chaser')
     pylab.xlabel('chased')
     n = len(animals)
-    pylab.xticks(numpy.arange(n), ['%s' % hex(a) for a in animals], rotation=45)
-    pylab.yticks(numpy.arange(n), ['%s' % hex(a) for a in animals])
+    if isinstance(animals[0], int):
+        ans = ['%s' % hex(a) for a in animals]
+    else:
+        ans = ['%s' % a for a in animals]
+    pylab.xticks(numpy.arange(n), ans, rotation=45)
+    pylab.yticks(numpy.arange(n), ans)
     for y in range(n):
         for x in range(n):
             pylab.text(
