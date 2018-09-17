@@ -300,5 +300,7 @@ class Colony(object):
         for t in self.tubes:
             for mae in t.multi_animal_events:
                 chaser, chasee, _ = mae
+                if (chaser not in animals) or (chasee not in animals):
+                    continue
                 maes[ti(chaser), ti(chasee)] += 1
         return maes, animals
