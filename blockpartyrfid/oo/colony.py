@@ -29,6 +29,9 @@ class Colony(object):
         # if not ring, n_cages = n_tubes +1
         self.cages = [Cage(i) for i in range(n_tubes + int(self.ring))]
         self.animals = {}  # by rfid
+        self.ignore_animals = []
+        self.save_reads = False
+        self.saved_reads = []
         self.autotune_merge_threshold = autotune_merge_threshold
         self.rfid_merge_threshold = rfid_merge_threshold
     
@@ -42,6 +45,8 @@ class Colony(object):
         # if rfid read, pass to animal
         if event.etype == consts.EVENT_RFID:
             rfid = event.data0
+            if rfid in self.ignore_animals:
+                return
             if rfid not in self.animals:
                 self.animals[rfid] = Animal(rfid)
             animal = self.animals[rfid]
@@ -50,6 +55,12 @@ class Colony(object):
             # this read is > merge time later than the last read
             if animal.last_read is None:
                 animal.last_read = event
+                animal.was_read(event.board, event.world_timestamp)
+                self.tubes[event.board].read_animal(
+                            rfid, event.world_timestamp)
+                if self.save_reads:
+                    self.saved_reads.append([
+                        event.world_timestamp, rfid, event.board])
             else:
                 if event.data0 == debug_animal:
                     print("Animal read: %s, %s" % (event.timestamp, event.board))
@@ -61,6 +72,9 @@ class Colony(object):
                     animal.was_read(event.board, event.world_timestamp)
                     self.tubes[event.board].read_animal(
                             rfid, event.world_timestamp)
+                    if self.save_reads:
+                        self.saved_reads.append([
+                            event.world_timestamp, rfid, event.board])
                     # track tube reads
                     if (
                             (event.board == last_read.board + 1) or
@@ -143,6 +157,9 @@ class Colony(object):
                     animal.was_read(event.board, event.world_timestamp)
                     self.tubes[event.board].read_animal(
                             rfid, event.world_timestamp)
+                    if self.save_reads:
+                        self.saved_reads.append([
+                            event.world_timestamp, rfid, event.board])
                     
                     # predicting that the animal moved out of the adjacent
                     # cage, through this tube to the connected cage
@@ -201,7 +218,10 @@ class Colony(object):
     def process_directory(
             self, directory, pre_measure_rfid_merge_threshold=True,
             pre_sync_clocks=True, multi_animal_event_threshold=None):
-        fns = glob.glob(os.path.join(directory, '*.csv'))
+        fns = [
+            fn for fn in
+            glob.glob(os.path.join(directory, '*.csv'))
+            if 'animals.csv' not in fn]
         # read all events
         evs = {}
         for fn in fns:
@@ -229,11 +249,13 @@ class Colony(object):
                         synced = True
                     elif e.etype == consts.EVENT_RFID:
                         aid = e.data0
+                        if aid in self.ignore_animals:
+                            continue
                         if aid in ats and (ats[aid].board != e.board):
                             dt = e.timestamp - ats[aid].timestamp
                             if dt < 0:
                                 # account for rollover
-                                dt = e.timestamp - (ats[aid] + 2 ** 32)
+                                dt = e.timestamp - (ats[aid].timestamp - 2 ** 32)
                             if mdt is None:
                                 mdt = dt
                             else:
@@ -250,6 +272,7 @@ class Colony(object):
         for t in self.tubes:
             t.multi_animal_event_threshold = (
                 multi_animal_event_threshold)
+        self.saved_reads = []
         for fn in fns:
             """
             # parse timestamp from filename
