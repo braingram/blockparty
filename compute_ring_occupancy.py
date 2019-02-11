@@ -14,6 +14,7 @@ n_cages = 10
 is_ring = True
 output_filename = 'ring_occupancy.csv'
 reads_output_filename = 'reads.csv'
+multi_animal_events_filename = 'multi_animal_events.csv'
 min_rfid_reads = 100
 
 if len(sys.argv) > 1:
@@ -57,6 +58,20 @@ cm, cm_animals = c.get_chase_matrix(animals=animals)
 # save occupancy as csv
 print("Saving to %s" % output_filename)
 numpy.savetxt(output_filename, o, delimiter=',')
+
+# save multi-animal events
+# first combine into 1 list
+maes = []
+for (i, t) in enumerate(c.tubes):
+    for e in t.multi_animal_events:
+        # time, tube index, chaser, chasee
+        maes.append([e[2], i, e[0], e[1]])
+# sort by time
+maes.sort(key=lambda e: e[0])
+# save
+with open(multi_animal_events_filename, 'w') as f:
+    for mae in maes:
+        f.write(','.join([str(s) for s in mae]) + '\n')
 
 # plot
 pylab.figure()
