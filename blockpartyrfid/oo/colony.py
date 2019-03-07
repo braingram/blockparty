@@ -222,6 +222,9 @@ class Colony(object):
             fn for fn in
             glob.glob(os.path.join(directory, '*.csv'))
             if 'animals.csv' not in fn]
+        if len(fns) == 0:
+            raise Exception(
+                "No csv data files found in directory: %s" % directory)
         # read all events
         evs = {}
         for fn in fns:
