@@ -25,16 +25,16 @@ c = blockpartyrfid.oo.colony.Colony(n_cages, ring=is_ring)
 
 c.save_reads = True
 c.ignore_animals = [
-    "C000000000", # read errors
-    "007F007F00",
-    "F000000000",
-    "002FBE75C3",
-    "002FBE7443",
-    "002FBE7455",
-    "002FBE744F",
-    "002FBE75D3",
-    "002FBE75F3",
-    "002FBE76F5",  # died
+#    "C000000000", # read errors
+#    "007F007F00",
+#    "F000000000",
+#    "002FBE75C3",
+#    "002FBE7443",
+#    "002FBE7455",
+#    "002FBE744F",
+#    "002FBE75D3",
+#    "002FBE75F3",
+#    "002FBE76F5",  # died
 ]
 
 # process logs
