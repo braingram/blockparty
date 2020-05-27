@@ -8,7 +8,7 @@ import matplotlib.animation
 
 fn = 'reads.csv'
 ring = True
-n_tubes = None  # guess from data
+n_tubes = None  # None: guess from data 
 
 # read in reads
 # how many tubes?
@@ -114,15 +114,18 @@ class DataSource(object):
         
         self.ani = matplotlib.animation.FuncAnimation(
             self.fig, self.update_display, interval=1000 / self.fps,
-            blit=True)
+            blit=True, repeat=False, frames=n_frames)
 
     def show(self):
         pylab.show()
     
-    def save(self, fn):
-        self.ani.save(fn)
+    def save(self, fn, writer_name):
+        writer = matplotlib.animation.writers[writer_name](self.fps)
+        self.ani.save(fn, writer=writer)
 
     def update_display(self, i):
+        if i % 30 == 0:
+            print("Rendering", i)
         # advance frame time
         self.frame_time += self.seconds_per_frame
 
@@ -130,7 +133,7 @@ class DataSource(object):
         moves = {}
         for aid in self.data:
             r = self.read_lists[aid]
-            while (r.get()[0] is not None and r.get()[0] <= self.frame_time):
+            while (r.get() is not None and r.get()[0] <= self.frame_time):
                 moves[aid] = moves.get(aid, []) + [r.get()[1], ]
                 r.advance()
 
@@ -152,7 +155,8 @@ class DataSource(object):
                     a = l.get_alpha()
                     if a < self.fade_per_frame:
                         remove.append(l)
-                    l.set_alpha(a - self.fade_per_frame)
+                    else:
+                        l.set_alpha(a - self.fade_per_frame)
                 [self.lines[aid].remove(r) for r in remove]
                 xys = numpy.array(xys)
                 # add new line
@@ -169,5 +173,5 @@ class DataSource(object):
 
 if __name__ == '__main__':
     d = DataSource(fn, ring=ring, n_tubes=n_tubes)
-    d.show()
-    
+    #d.show()
+    d.save('anim.html', 'html')
