@@ -8,7 +8,35 @@ import matplotlib.animation
 
 fn = 'reads.csv'
 ring = True
-n_tubes = None  # None: guess from data 
+n_tubes = None  # None: guess from data
+seconds_per_frame = 10  # None: compute assuming 2 minute animation
+# if animals is None, default colormap will be used
+# if animals is a list, only these animals will be plotted
+#  and the default color map will be used
+# if animals is a dict, only these animals will be plotted
+#  and animals will be colored by the value where value can be
+#   - color (see matplotlib colors)
+#   - colormap (see matplotlib colormaps)
+animals = None
+
+animals = {
+    "2A006D4CAA": "#FF3399",
+    "2A006D5A23": "#FF80BF",
+    "2A006D2C01": "#FF0080",
+    "2A006D4225": "#FF198C",
+    "2A006D521F": "#FF66B3",
+    "2A006D5CED": "#FFB3D9",
+    "2A006D5AF7": "#FF99CC",
+    "2A006D4F9F": "#FF4DA6",
+    "2A006D2DB9": "#4DFFA6",
+    "2A006D2D1B": "#33FF99",
+    "2A006D2AF5": "#19FF8C",
+    "2A006D69CD": "#B3FFD9",
+    "2A006D2AD5": "#00FF80",
+    "2A006D30B6": "#66FFB3",
+    "2A006D5211": "#99FFCC",
+    "2A006D4D51": "#80FFBF",
+}
 
 # read in reads
 # how many tubes?
@@ -19,12 +47,12 @@ class ReadList(object):
         self.data = data
         self.n = len(self.data)
         self.i = 0
-    
+
     def get(self):
         if self.i < self.n:
             return self.data[self.i]
         return None
-    
+
     def peek(self):
         i = self.i + 1
         if i < self.n:
@@ -36,9 +64,15 @@ class ReadList(object):
 
 
 class DataSource(object):
-    def __init__(self, fn, ring=True, n_tubes=None):
+    def __init__(
+            self, fn, ring=True, n_tubes=None, animals=None,
+            seconds_per_frame=None):
         self.n_tubes = 0
         self.min_time = None
+        if animals is None:
+            valid_animal = lambda aid: True
+        else:
+            valid_animal = lambda aid: aid in animals
         self.data = {}  # by animal id: (timestamp offset, tube id)
         # read in data
         with open(fn, 'r') as f:
@@ -46,6 +80,8 @@ class DataSource(object):
                 if not len(l.strip()):
                     continue
                 ts, aid, tid = l.strip().split(',')
+                if not valid_animal(aid):
+                    continue
                 ts = float(ts) / 1000.
                 tid = int(tid)
                 if self.min_time is None:
@@ -54,15 +90,16 @@ class DataSource(object):
                     self.data[aid] = []
                 self.data[aid].append((ts - self.min_time, tid))
                 self.n_tubes = max(self.n_tubes, tid)
+        print("N animals: %s" % len(self.data))
         # run duration in seconds
         self.duration = ts - self.min_time
-        
+
         if n_tubes is None:
             # n_tubes is 1 more than max
             self.n_tubes += 1
         else:
             self.n_tubes = n_tubes
-        
+
         # pre-compute tube vectors
         radius = 200
         radius_temp = radius
@@ -78,26 +115,61 @@ class DataSource(object):
             x = numpy.cos(p)
             y = numpy.sin(p)
             self.tube_vectors.append(numpy.array([x, y]))
-        
+
         # compute a reasonable time compression
         self.fade_per_frame = 0.3
         self.fps = 30
-        animation_duration = 120
-        n_frames = self.fps * animation_duration
-        self.seconds_per_frame = self.duration / n_frames
-        #self.seconds_per_frame = 10.
-        
+        if seconds_per_frame is None:
+            animation_duration = 120
+            n_frames = self.fps * animation_duration
+            self.seconds_per_frame = self.duration / n_frames
+        else:
+            self.seconds_per_frame = seconds_per_frame
+            n_frames = int(numpy.ceil(self.duration / self.seconds_per_frame))
+
+
         self.frame_time = 0
-        
+
         self.read_lists = {k: ReadList(self.data[k]) for k in self.data}
 
+        default_cm = matplotlib.cm.hsv
+        # make color maps for animals
+        if animals is None or not isinstance(animals, dict):
+            self.animal_colors = {
+                aid: default_cm(i / (len(self.data) - 1.0))
+                for (i, aid) in enumerate(self.data)}
+        else:  # animals is a dict
+            # key can be a color map or a color
+            # find animals with matching colormap
+            animals_by_colormap = {}
+            self.animal_colors = {}
+            for aid in self.data:
+                if aid not in animals:
+                    cm = default_cm
+                elif isinstance(animals[aid], matplotlib.colors.Colormap):
+                    cm = animals[aid]
+                else:
+                    if not matplotlib.colors.is_color_like(animals[aid]):
+                        raise ValueError("Invalid color:%s" % (animals[aid], ))
+                    self.animal_colors[aid] = animals[aid]
+                    continue  # assume animals[aid] is a color
+                if cm not in animals_by_colormap:
+                    animals_by_colormap[cm] = []
+                animals_by_colormap[cm].append(aid)
+            # for each color map found, assign colors to animals
+            for cm in animals_by_colormap:
+                cm_animals = animals_by_colormap[cm]
+                if len(cm_animals) == 1:
+                    self.animal_colors[cm_animals[0]] = cm(1.0)
+                else:
+                    for (i, aid) in enumerate(cm_animals):
+                        self.animal_colors[aid] = cm(i / len(cm_animals - 1.0))
+        print(self.animal_colors)
         self.scatters = {}
         self.lines = {}
-        self.animal_colors = {}
-        cm = matplotlib.cm.hsv
-        for (i, aid) in enumerate(self.data):
-            c = cm(i / (len(self.data) - 1))
-            self.animal_colors[aid] = c
+        for aid in self.data:
+            # generate animal color from color map
+            c = self.animal_colors[aid]
             # draw points for last position
             self.scatters[aid] = pylab.scatter([], [], color=c)
             # draw lines for previous positions
@@ -111,14 +183,14 @@ class DataSource(object):
         self.ax.set_ylim(*self.ax.get_xlim())
         #self.ax.set_ylim(-radius-radius_, radius)
         self.ax.set_aspect(1.0)
-        
+
         self.ani = matplotlib.animation.FuncAnimation(
             self.fig, self.update_display, interval=1000 / self.fps,
             blit=True, repeat=False, frames=n_frames)
 
     def show(self):
         pylab.show()
-    
+
     def save(self, fn, writer_name):
         writer = matplotlib.animation.writers[writer_name](self.fps)
         self.ani.save(fn, writer=writer)
@@ -172,6 +244,8 @@ class DataSource(object):
 
 
 if __name__ == '__main__':
-    d = DataSource(fn, ring=ring, n_tubes=n_tubes)
-    #d.show()
-    d.save('anim.html', 'html')
+    d = DataSource(
+        fn, ring=ring, n_tubes=n_tubes, animals=animals,
+        seconds_per_frame=seconds_per_frame)
+    d.show()
+    #d.save('anim.html', 'html')
