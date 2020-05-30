@@ -19,24 +19,31 @@ seconds_per_frame = 10  # None: compute assuming 2 minute animation
 #   - colormap (see matplotlib colormaps)
 animals = None
 
-animals = {
-    "2A006D4CAA": "#FF3399",
-    "2A006D5A23": "#FF80BF",
-    "2A006D2C01": "#FF0080",
-    "2A006D4225": "#FF198C",
-    "2A006D521F": "#FF66B3",
-    "2A006D5CED": "#FFB3D9",
-    "2A006D5AF7": "#FF99CC",
-    "2A006D4F9F": "#FF4DA6",
-    "2A006D2DB9": "#4DFFA6",
-    "2A006D2D1B": "#33FF99",
-    "2A006D2AF5": "#19FF8C",
-    "2A006D69CD": "#B3FFD9",
-    "2A006D2AD5": "#00FF80",
-    "2A006D30B6": "#66FFB3",
-    "2A006D5211": "#99FFCC",
-    "2A006D4D51": "#80FFBF",
-}
+# animals = ["002FBE7309", "002FBE7189"]
+
+# animals = {
+#     "002FBE7309": matplotlib.cm.jet,
+#     "002FBE7189": matplotlib.cm.hsv,
+# }
+
+# animals = {
+#     "2A006D4CAA": "#FF3399",
+#     "2A006D5A23": "#FF80BF",
+#     "2A006D2C01": "#FF0080",
+#     "2A006D4225": "#FF198C",
+#     "2A006D521F": "#FF66B3",
+#     "2A006D5CED": "#FFB3D9",
+#     "2A006D5AF7": "#FF99CC",
+#     "2A006D4F9F": "#FF4DA6",
+#     "2A006D2DB9": "#4DFFA6",
+#     "2A006D2D1B": "#33FF99",
+#     "2A006D2AF5": "#19FF8C",
+#     "2A006D69CD": "#B3FFD9",
+#     "2A006D2AD5": "#00FF80",
+#     "2A006D30B6": "#66FFB3",
+#     "2A006D5211": "#99FFCC",
+#     "2A006D4D51": "#80FFBF",
+# }
 
 # read in reads
 # how many tubes?
@@ -80,17 +87,19 @@ class DataSource(object):
                 if not len(l.strip()):
                     continue
                 ts, aid, tid = l.strip().split(',')
-                if not valid_animal(aid):
-                    continue
                 ts = float(ts) / 1000.
                 tid = int(tid)
+                self.n_tubes = max(self.n_tubes, tid)
                 if self.min_time is None:
                     self.min_time = ts
+                if not valid_animal(aid):
+                    continue
                 if aid not in self.data:
                     self.data[aid] = []
                 self.data[aid].append((ts - self.min_time, tid))
-                self.n_tubes = max(self.n_tubes, tid)
         print("N animals: %s" % len(self.data))
+        if len(self.data) == 0:
+            raise Exception("No valid animals found")
         # run duration in seconds
         self.duration = ts - self.min_time
 
@@ -136,7 +145,7 @@ class DataSource(object):
         # make color maps for animals
         if animals is None or not isinstance(animals, dict):
             self.animal_colors = {
-                aid: default_cm(i / (len(self.data) - 1.0))
+                aid: default_cm(i / (max(1.0, len(self.data) - 1.0)))
                 for (i, aid) in enumerate(self.data)}
         else:  # animals is a dict
             # key can be a color map or a color
@@ -159,11 +168,8 @@ class DataSource(object):
             # for each color map found, assign colors to animals
             for cm in animals_by_colormap:
                 cm_animals = animals_by_colormap[cm]
-                if len(cm_animals) == 1:
-                    self.animal_colors[cm_animals[0]] = cm(1.0)
-                else:
-                    for (i, aid) in enumerate(cm_animals):
-                        self.animal_colors[aid] = cm(i / len(cm_animals - 1.0))
+                for (i, aid) in enumerate(cm_animals):
+                    self.animal_colors[aid] = cm(i / max(1.0, len(cm_animals) - 1.0))
         print(self.animal_colors)
         self.scatters = {}
         self.lines = {}
