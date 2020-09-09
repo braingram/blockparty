@@ -42,7 +42,11 @@ c.process_directory(dname)
 
 animals = [
     aid for aid in c.animals if c.animals[aid].get_n_reads() > min_rfid_reads]
-
+print(animals)
+print("Founds animals:")
+for a in animals:
+    print("  %s" % a)
+print("RFID merge threshold:", c.rfid_merge_threshold)
 # save reads
 print("Saving to %s" % reads_output_filename)
 with open(reads_output_filename, 'w') as f:

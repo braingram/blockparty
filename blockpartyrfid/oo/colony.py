@@ -218,13 +218,16 @@ class Colony(object):
     def process_directory(
             self, directory, pre_measure_rfid_merge_threshold=True,
             pre_sync_clocks=True, multi_animal_event_threshold=None):
-        fns = [
+        fns = sorted([
             fn for fn in
             glob.glob(os.path.join(directory, '*.csv'))
-            if 'animals.csv' not in fn]
+            if 'animals.csv' not in fn])
         if len(fns) == 0:
             raise Exception(
                 "No csv data files found in directory: %s" % directory)
+        print("Processing %s files" % len(fns))
+        print("First file: %s" % fns[0])
+        print("Last file: %s" % fns[-1])
         # read all events
         evs = {}
         for fn in fns:
