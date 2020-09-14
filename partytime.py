@@ -138,6 +138,35 @@ class BlockParty:
         self.event_log_file = open(self.event_log_filename, 'w')
         self.connection.write('t'.encode())
 
+    def reset_counts(self):
+        for bid in self.tubes:
+            t = self.tubes[bid]
+            if 'nreads' in t['rfid']:
+                t['rfid']['nreads'] = 0
+            if 'reads' in t['rfid']:
+                t['rfid']['reads'] = []
+            if 'reads_per_second' in t['rfid']:
+                t['rfid']['reads_per_second'] = 0
+            if 'nbreaks' in t['beam']['left']:
+                t['beam']['left']['nbreaks'] = 0
+            if 'nbreaks' in t['beam']['right']:
+                t['beam']['right']['nbreaks'] = 0
+        for tag in self.mice:
+            m = self.mice[tag]
+            if 'nreads' in m:
+                m['nreads'] = 0
+
+    def update_reads_per_second(self):
+        t = time.time()
+        for bid in self.tubes:
+            r = self.tubes[bid]['rfid']
+            if 'reads' not in r:
+                continue
+            reads = r['reads']
+            reads = [r for r in reads if t - r <= 1.0]
+            r['reads'] = reads
+            r['reads_per_second'] = len(reads)
+
     def update_colony(self, event):
         """Handle an incoming event
         
@@ -145,13 +174,25 @@ class BlockParty:
         changed = False
         if event.board_id not in self.tubes:
             self.tubes[event.board_id] = {
-                'rfid': None,
+                'rfid': {},
+                'beam': {
+                    'left': {},
+                    'right': {},
+                },
             }
             changed = True
         if event.event_id == EVENT_RFID:
+            reads = self.tubes[event.board_id]['rfid'].get('reads', [])
+            # filter out old reads
+            t = time.time()
+            reads = [r for r in reads if t - r <= 1.0]
+            reads.append(t)
             self.tubes[event.board_id]['rfid'] = {
                 'id': event.data0,
                 'timestamp': event.timestamp,
+                'nreads': self.tubes[event.board_id]['rfid'].get('nreads', 0) + 1,
+                'reads': reads,
+                'reads_per_second': len(reads),
             }
             self.mice[event.data0] = {
                 'tube': event.board_id,
@@ -159,6 +200,16 @@ class BlockParty:
                 'nreads': self.mice.get(event.data0, {}).get('nreads', 0) + 1,
             }
             changed = True
+        elif event.event_id == EVENT_BEAM:
+            if (event.data1 == 'b'):
+                if (event.data0 == 'L'):
+                    side = 'left'
+                else:
+                    side = 'right'
+
+                self.tubes[event.board_id]['beam'][side] = {
+                    'nbreaks': self.tubes[event.board_id]['beam'][side].get('nbreaks', 0) + 1,
+                }
         return changed
 
     def log_event(self, event):
@@ -293,7 +344,11 @@ class MainWindow:
         self.mouse_rows = []
         # title = log directory
         # per cage: [ID] [N] : rfids...
-        base_frame = self.root
+        tk.Button(
+            self.root, text="Reset counts", command=self.reset_counts).pack()
+        base_frame = tk.Frame(self.root)
+        base_frame.pack()
+        #base_frame = self.root
         # make labels
         #f = tk.Frame(base_frame)
         #f.pack(side=tk.TOP, fill=tk.X)
@@ -303,7 +358,7 @@ class MainWindow:
         self.tube_frame = tk.Frame(base_frame)
         self.tube_frame.grid(row=0, column=0)
         f = self.tube_frame
-        for (i, t) in enumerate(('Tube', 'LBB', 'RFID', 'RBB')):
+        for (i, t) in enumerate(('Tube', 'LBB', 'RFID', 'RBB', 'NReads', 'RPS')):
             tk.Label(f, text=t).grid(row=0, column=i)
         self.mouse_frame = tk.Frame(base_frame, bd=2, relief='groove')
         self.mouse_frame.grid(row=0, column=1)
@@ -355,7 +410,7 @@ class MainWindow:
         row = {}
         f = self.tube_frame
         ri = len(self.tube_rows) + 1
-        for (i, t) in enumerate(('Tube', 'LBB', 'RFID', 'RBB')):
+        for (i, t) in enumerate(('Tube', 'LBB', 'RFID', 'RBB', 'NReads', 'RPS')):
             if t == 'Tube':
                 row[t] = tk.Label(f, text='%i' % len(self.tube_rows))
             else:
@@ -383,6 +438,25 @@ class MainWindow:
             r['NReads'].config(text=md['nreads'])
             r['Timestamp'].config(text=md['datetime'].ctime())
     
+    def update_reads_per_second(self):
+        self.party.update_reads_per_second()
+        for bid in self.party.tubes:
+            d = self.party.tubes[bid]['rfid']
+            if 'reads' not in d:
+                continue
+            r = self.tube_rows[bid]
+            r['RPS'].config(
+                text=str(d['reads_per_second']))
+        self.root.after(1000, self.update_reads_per_second)
+
+    def reset_counts(self):
+        self.party.reset_counts()
+        for bid in self.party.tubes:
+            r = self.tube_rows[bid]
+            r['NReads'].config(text="0")
+            r['RPS'].config(text="0")
+        self.redraw_mouse_rows()
+
     def update(self):
         changed, event = self.party.update()
         if changed:
@@ -403,6 +477,12 @@ class MainWindow:
             # show rfid
             r = self.tube_rows[event.board_id]
             r['RFID'].config(text=event.data0)
+            r['NReads'].config(
+                text=str(
+                    self.party.tubes[event.board_id]['rfid']['nreads']))
+            r['RPS'].config(
+                text=str(
+                    self.party.tubes[event.board_id]['rfid']['reads_per_second']))
             # TODO if error, change color?
         # re-register update
         self.root.after(1, self.update)
@@ -410,6 +490,7 @@ class MainWindow:
     def run(self):
         # register update callback
         self.update()
+        self.update_reads_per_second()
         self.root.mainloop()
 
 def ui_run(args):
